@@ -40,7 +40,8 @@ vpath %.c .
 
 BINS := hello \
 	list \
-	initializer_list
+	initializer_list \
+	exception_type
 
 
 .PHONY: all
