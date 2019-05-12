@@ -59,7 +59,7 @@ void
 iStack::pop(int &top_value) throw(popOnEmpty)
 {
 	if(empty())
-		throw popOnEmpty();
+                throw popOnEmpty{};
 
 	top_value = _stack[--_top];
 	cout << "iStack::pop(): " << top_value << endl;

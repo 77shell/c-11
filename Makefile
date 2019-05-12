@@ -42,6 +42,8 @@ BINS := hello \
 	list \
 	initializer_list \
 	exception_type
+	exception \
+	exception_13_5_2
 
 
 .PHONY: all
