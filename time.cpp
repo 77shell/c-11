@@ -11,4 +11,6 @@ main(int argc, char *argv[])
         std::this_thread::sleep_for(std::chrono::seconds(1));
         auto t1 = std::chrono::high_resolution_clock::now();
         std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << "ms\n";
+
+        std::chrono::time_point<std::chrono::steady_clock> p0 {std::chrono::steady_clock::now()};
 }

@@ -36,6 +36,11 @@ main(int argc, char *argv[])
         f(lst);
         f2(lst);
         f3();
+
+	for(int i=0; i<3; i++)
+		for(auto i : lst)
+			cout << i;
+	
         std::cout << "Hello world" << std::endl;
         exit(EXIT_SUCCESS);
 }
