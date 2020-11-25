@@ -37,6 +37,24 @@ public:
         char *s;
 };
 
+class MyInt {
+        int m;
+
+public:
+        MyInt(int i)
+                : m {i}
+                {}
+
+        MyInt(MyInt i)
+                {
+                        i.m++;
+                        m = i.m;
+                }
+
+        
+};
+   
+
 int main(int argc, char *argv[])
         try {
                 X x1 {"whatever"};
@@ -45,7 +63,10 @@ int main(int argc, char *argv[])
                 //x2 = x3;
 
                 X x4 {"youdontknow"};
-                x4 = x1;
+                //x4 = x1;
+
+                MyInt a {1};
+                MyInt b {a};
         }
         catch(...) {
         }

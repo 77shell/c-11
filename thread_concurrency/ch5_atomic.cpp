@@ -19,6 +19,7 @@ main(int argc, char *argv[])
         while(atm_f.test_and_set());
         std::cout << "Lock free type ? : " << ATOMIC_BOOL_LOCK_FREE << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::cout << "Clear flag\n";
         atm_f.clear();
         return 0;
 }
