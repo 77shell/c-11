@@ -1,3 +1,4 @@
+#include <map>
 #include <functional>
 #include <iostream>
  
@@ -18,9 +19,33 @@ struct PrintNum {
                         std::cout << i << '\n';
                 }
 };
+
+struct S_t {
+	enum T_e {
+		eT1,
+		eT2
+	};
+	void f1(int x, int y) {
+		std::cout << __func__ << "\t" << x << "\t" << y << std::endl;
+	}
+	void f2(int x, int y) {
+		std::cout << __func__ << "\t" << x << "\t" << y << std::endl;
+	}
+};
  
 int main()
 {
+	S_t s;
+	std::function<void(int, int)>
+		pf_f1 {std::bind(&S_t::f1, &s, std::placeholders::_1, std::placeholders::_2)},
+		pf_f2 {std::bind(&S_t::f2, &s, std::placeholders::_1, std::placeholders::_2)};
+	std::map<S_t::T_e, std::function<void(int, int)>> f_map {
+		{S_t::eT1, pf_f1},
+		{S_t::eT2, pf_f2}
+	};
+	f_map[S_t::eT1](1, 2);
+	f_map[S_t::eT2](2, 3);
+
         // store a free function
         std::function<void(int)> f_display = print_num;
         f_display(-9);

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <typeindex>
+#include <map>
 
 struct A {
         A(int j)
@@ -25,10 +26,46 @@ struct AA {
 
 AA aa;
 
+struct B {
+   virtual std::type_index type_id() = 0;
+   virtual std::string name() = 0;
+};
+
+struct B1 : public B {
+   virtual std::type_index type_id()
+      {
+	 return std::type_index(typeid(B1));
+      }
+   virtual std::string name()
+      {
+	 return std::string {"B1"};
+      }
+};
+
+struct B2 : public B {
+   virtual std::type_index type_id()
+      {
+	 return std::type_index(typeid(B2));
+      }
+   virtual std::string name()
+      {
+	 return std::string {"B2"};
+      }
+};
+
+B1 b1;
+B2 b2;
+
+std::map<std::type_index, B*> typeid_map {
+   { std::type_index(typeid(B1)), &b1 },
+   { std::type_index(typeid(B2)), &b2 }
+};
+
 int
 main(int argc, char *argv[])
 {
         std::cout << typeid(A::map[1]).name() << std::endl;
-        
+	B *pB {&b1};
+	std::cout << typeid_map[pB->type_id()]->name() << std::endl;
         return 0;
 }

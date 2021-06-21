@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 
         for(int i=0;;i++, sleep(1))
         {
-                if(i == 3)
+                if(i == 100)
                         h();
         }
         return 0;
