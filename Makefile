@@ -41,24 +41,36 @@ vpath %.c .
 BINS := hello \
 	list \
 	initializer_list \
-	exception_type
+	exception_type \
 	exception \
 	exception_13_5_2
 
 
+.PHONY: impl
+impl: impl_pattern.cpp impl_pattern_test.cpp
+	g++ -o$@ $^
+
 .PHONY: all
 all: $(BINS)
-
 
 #receiver: receiver.o
 #	$(CXX) -o $@ $< -lcan
 
+sha256: sha256.c
+	$(COMPILE.c) -o $@ $< -lcrypto
+
+zip: zip.cpp
+	$(COMPILE.cc) -o $@ $< -lzip
+
+unzip: unzip.c
+	$(COMPILE.c) -o$@ $< -lzip
 
 %: %.c
 	$(COMPILE.c) -o $@ $< $(LIB)
 
 %: %.cpp
 	$(COMPILE.cc) -o$@ $< $(LIB)
+
 
 .PHONY: clean
 clean:
