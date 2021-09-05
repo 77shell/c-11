@@ -37,13 +37,14 @@ COMPILE.c  = $(CC)  $(CFLAGS)
 vpath %.cpp .
 vpath %.c .
 
-
 BINS := hello \
 	list \
 	initializer_list \
 	exception_type \
 	exception \
-	exception_13_5_2
+	exception_13_5_2 \
+	cond_var \
+	catch_signals
 
 
 .PHONY: impl
@@ -65,21 +66,24 @@ zip: zip.cpp
 unzip: unzip.c
 	$(COMPILE.c) -o$@ $< -lzip
 
+cond_var: cond_var.cpp
+	$(CXX) -std=c++14 -pthread -o$@ $^
+
 %: %.c
 	$(COMPILE.c) -o $@ $< $(LIB)
 
 %: %.cpp
 	$(COMPILE.cc) -o$@ $< $(LIB)
 
+.PHONY: impl
+impl: impl.cpp impl.h impl_test.cpp
+	g++ -std=c++14 $^ -o $@
 
 .PHONY: clean
 clean:
 	rm -rf *.o $(csu502) db_para.*
 	find . -regextype posix-egrep -iregex '.*\.#.*' | xargs rm
 	find . -iregex .*~$ | xargs rm
-
-.PHONY: clean
-clean:
 	rm $(BINS) *.o *~ -rf
 
 
