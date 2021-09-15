@@ -17,12 +17,21 @@
 #include <iterator>
 #include <numeric>
 #include <algorithm>
+#include <chrono>
 
 #define __DEBUG_MESG
 
 struct data_t {
-	data_t()
-		: sample_nbr {60}, sample_vec(sample_nbr), sample_ite {sample_vec.begin()}, average {0}
+	data_t(size_t sampling_time)
+		: sample_nbr {sampling_time}, sample_vec(sampling_time), sample_ite {sample_vec.begin()}, average {0}
+		{}
+
+	data_t(const data_t &r)
+		: sample_nbr {r.sample_nbr}, sample_vec {r.sample_vec}, sample_ite {sample_vec.begin()}, average {0}
+		{}
+
+	data_t(data_t &&r)
+		: sample_nbr {r.sample_nbr}, sample_vec {std::move(r.sample_vec)}, sample_ite {sample_vec.begin()}, average {0}
 		{}
 
 	std::size_t sample_nbr;
@@ -31,30 +40,41 @@ struct data_t {
 	uint16_t average;
 
 	void feed_sample(uint16_t fuel_level);
+	bool freshed();
 };
 
 void
 data_t::feed_sample(uint16_t fuel_level)
 {
-	constexpr uint32_t max_level {120};
+	constexpr uint16_t max_level {120};
 	if(fuel_level > max_level)
 		return;
 
-	*sample_ite = fuel_level;
-	sample_ite++;
 	if(sample_ite == sample_vec.end()) {
-		uint16_t sum = std::accumulate(sample_vec.begin(), sample_vec.end(), 0);
-		average = sum / sample_nbr;
 		sample_ite = sample_vec.begin();
-
-#ifdef __DEBUG_MESG
-		std::for_each(sample_vec.begin(), sample_vec.end(), [](uint16_t level) {
-								       std::cerr << "level: " << level << std::endl;
-							       }
-			);
-		std::cerr << "average level: " << average << std::endl;
-#endif
+		*sample_ite = fuel_level;
 	}
+	else {
+		*sample_ite = fuel_level;
+		sample_ite++;
+		if(sample_ite == sample_vec.end()) {
+			uint16_t sum = std::accumulate(sample_vec.begin(), sample_vec.end(), 0);
+			average = sum / sample_nbr;
+#ifdef __DEBUG_MESG
+			std::for_each(sample_vec.begin(), sample_vec.end(), [](uint16_t level) {
+										    std::cerr << "level: " << level << std::endl;
+									    }
+				);
+			std::cerr << "average level: " << average << std::endl;
+#endif
+		}
+	}
+}
+
+bool
+data_t::freshed()
+{
+	return sample_ite == sample_vec.end();
 }
 
 struct recorder_error_t {
@@ -70,21 +90,36 @@ struct recorder_error_t {
 };
 
 struct RECORDER {
-	RECORDER(std::size_t min)
-		: interval_min {min}, head_idx {0}, data(interval_min)
+	RECORDER(std::size_t min, std::size_t sampling_per_min)
+		: interval_min {min}, sampling_times_min {sampling_per_min}, head_idx {0}, data_length {0}, data(min, sampling_times_min)
 		{}
 
 	std::size_t interval_min;
+	std::size_t sampling_times_min;
 	std::size_t head_idx;
+	std::size_t data_length;
 	std::vector<data_t> data;
 
 	/* Range: 1 ~ interval_min
+	 
+	   ----+--------------------+---> T (minute)
+               ^                    ^
+          interval_min             Now (1)
+
 	 */
-	data_t& get(std::size_t min_th);
+	data_t& open(std::size_t min_th);
+	void save(uint16_t fuel_level);
+	size_t length();
+
+	template<class Rep, class Period>
+	void sampling_interval(std::chrono::duration<Rep, Period> &r)
+		{
+			r = std::chrono::duration_cast<std::chrono::duration<Rep,Period>>(std::chrono::seconds {1}) / sampling_times_min;
+		}
 };
 
 data_t&
-RECORDER::get(std::size_t min_th)
+RECORDER::open(std::size_t min_th)
 {
 	if(min_th == 0 || min_th > interval_min)
 		throw recorder_error_t {recorder_error_t::eInvalid_query};
@@ -108,17 +143,46 @@ RECORDER::get(std::size_t min_th)
 	}
 }
 
+void
+RECORDER::save(uint16_t lvl)
+{
+	data_t &min {data.at(head_idx)};
+	min.feed_sample(lvl);
+
+	if(min.freshed())
+	{
+		// Update header
+		head_idx++;
+		head_idx %= interval_min;
+
+		// Update data length
+		if(data_length < interval_min)
+			data_length++;
+	}
+}
+
+size_t
+RECORDER::length()
+{
+	return data_length;
+}
+
 int
 main(int argc, char* argv[])
 {
-	constexpr size_t minutes_60 {60};
-	RECORDER fuelevel {minutes_60};
+	constexpr size_t _60_minutes {60};
+	constexpr size_t sampling_time {20};
+	RECORDER fuelevel {_60_minutes, sampling_time};
 
+	std::chrono::milliseconds ms;
+	fuelevel.sampling_interval(ms);
+	std::cerr << "Sampling interval: " << ms.count() << "ms\n";
 	try {
-		data_t &m = fuelevel.get(1);
-		for(uint16_t l=0; l<120; l++)
-			m.feed_sample(l);
-		
+		data_t &m = fuelevel.open(1);
+		for(uint16_t l=0; l<600; l++) {
+			fuelevel.save(l%121);
+			std::cerr << "Recorder length: " << fuelevel.length() << std::endl;
+		}
 	}
 	catch (...) {
 		std::cerr << "Got exception\n"; 
