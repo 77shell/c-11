@@ -53,22 +53,25 @@ data_t::feed_sample(uint16_t fuel_level)
 	if(sample_ite == sample_vec.end()) {
 		sample_ite = sample_vec.begin();
 		*sample_ite = fuel_level;
+		sample_ite++;
 	}
 	else {
 		*sample_ite = fuel_level;
 		sample_ite++;
-		if(sample_ite == sample_vec.end()) {
-			uint16_t sum = std::accumulate(sample_vec.begin(), sample_vec.end(), 0);
-			average = sum / sample_nbr;
-#ifdef __DEBUG_MESG
-			std::for_each(sample_vec.begin(), sample_vec.end(), [](uint16_t level) {
-										    std::cerr << "level: " << level << std::endl;
-									    }
-				);
-			std::cerr << "average level: " << average << std::endl;
-#endif
-		}
 	}
+
+	if(sample_ite == sample_vec.end()) {
+		uint16_t sum = std::accumulate(sample_vec.begin(), sample_vec.end(), 0);
+		average = sum / sample_nbr;
+#ifdef __DEBUG_MESG
+		std::for_each(sample_vec.begin(), sample_vec.end(), [](uint16_t level) {
+									    std::cerr << "level: " << level << std::endl;
+								    }
+			);
+		std::cerr << "average level: " << average << std::endl;
+#endif
+	}
+
 }
 
 bool
@@ -171,17 +174,19 @@ int
 main(int argc, char* argv[])
 {
 	constexpr size_t _60_minutes {60};
-	constexpr size_t sampling_time {20};
+	constexpr size_t sampling_time {3};
 	RECORDER fuelevel {_60_minutes, sampling_time};
 
 	std::chrono::milliseconds ms;
 	fuelevel.sampling_interval(ms);
 	std::cerr << "Sampling interval: " << ms.count() << "ms\n";
 	try {
-		data_t &m = fuelevel.open(1);
-		for(uint16_t l=0; l<600; l++) {
+		for(uint16_t l=0; l<660; l++) {
 			fuelevel.save(l%121);
-			std::cerr << "Recorder length: " << fuelevel.length() << std::endl;
+			std::cerr << "Recorder length: " << fuelevel.length();
+			std::cerr << "\tHead idx: " << fuelevel.head_idx << std::endl;
+			if(fuelevel.head_idx == 59)
+				std::cerr << "here\n";
 		}
 	}
 	catch (...) {
