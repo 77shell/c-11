@@ -47,23 +47,33 @@ BINS := hello \
 	catch_signals
 
 
+.PHONY: impl
+impl: impl_pattern.cpp impl_pattern_test.cpp
+	g++ -o$@ $^
+
 .PHONY: all
 all: $(BINS)
-
 
 #receiver: receiver.o
 #	$(CXX) -o $@ $< -lcan
 
+sha256: sha256.c
+	$(COMPILE.c) -o $@ $< -lcrypto
+
+zip: zip.cpp
+	$(COMPILE.cc) -o $@ $< -lzip
+
+unzip: unzip.c
+	$(COMPILE.c) -o$@ $< -lzip
+
+cond_var: cond_var.cpp
+	$(CXX) -std=c++14 -pthread -o$@ $^
 
 %: %.c
 	$(COMPILE.c) -o $@ $< $(LIB)
 
 %: %.cpp
 	$(COMPILE.cc) -o$@ $< $(LIB)
-
-
-cond_var: cond_var.cpp
-	$(CXX) -std=c++14 -pthread -o$@ $^
 
 .PHONY: impl
 impl: impl.cpp impl.h impl_test.cpp
