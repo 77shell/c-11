@@ -60,6 +60,9 @@ all: $(BINS)
 #receiver: receiver.o
 #	$(CXX) -o $@ $< -lcan
 
+deque: deque.cpp
+	$(COMPILE.cc) -o $@ $< -pthread
+
 sha256: sha256.c
 	$(COMPILE.c) -o $@ $< -lcrypto
 
