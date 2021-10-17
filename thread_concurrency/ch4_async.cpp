@@ -60,7 +60,7 @@ int foreground_task()
 
 int main(int argc, char *argv[])
 {
-        std::future<int> feedback_deferred {std::async(deferred_background_task)};
+        std::future<int> feedback_deferred {std::async(std::launch::deferred, deferred_background_task)};
         std::future<int> feedback_async    {std::async(std::launch::async, async_background_task)};
         std::future<int> feedback_async2   {std::async(std::launch::async, FuncObject(), 2)};
         foreground_task();

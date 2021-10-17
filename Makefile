@@ -12,11 +12,13 @@ DBG=y
 
 
 ifneq ($(DBG),y)
- DEBUG=
- OPTIMIZE=-O2
+DEBUG=
+OPTIMIZE=-O2
+PROFILE=
 else
- DEBUG=-g
- OPTIMIZE=-O0
+DEBUG=-g
+OPTIMIZE=-O0
+PROFILE=-pg
 endif
 
 
@@ -27,10 +29,11 @@ INCLUDEPATH += -iquote$(SRC_ROOT)/include
 LIBSPATH = -L$(SRC_ROOT)/ \
 	-L/usr/lib -Wl,-rpath,/usr/local/lib
 
-CPPFLAGS += $(FLAGS) $(DEBUG) $(OPTIMIZE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
-CFLAGS   += $(FLAGS) -Wextra -Wno-override-init $(DEBUG) $(OPTIMIZE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
 
-COMPILE.cc = $(CXX) $(CPPFLAGS)
+CXXFLAGS += $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
+CFLAGS   += -Wextra -Wno-override-init $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
+
+COMPILE.cc = $(CXX) $(CXXFLAGS)
 COMPILE.c  = $(CC)  $(CFLAGS)
 
 
@@ -44,8 +47,8 @@ BINS := hello \
 	exception \
 	exception_13_5_2 \
 	cond_var \
-	catch_signals
-
+	catch_signals \
+	unordered_map
 
 .PHONY: impl
 impl: impl_pattern.cpp impl_pattern_test.cpp
@@ -56,6 +59,9 @@ all: $(BINS)
 
 #receiver: receiver.o
 #	$(CXX) -o $@ $< -lcan
+
+deque: deque.cpp
+	$(COMPILE.cc) -o $@ $< -pthread
 
 sha256: sha256.c
 	$(COMPILE.c) -o $@ $< -lcrypto
