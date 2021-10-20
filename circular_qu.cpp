@@ -18,8 +18,50 @@
 #include <numeric>
 #include <algorithm>
 #include <chrono>
+#include <mutex>
+#include <condition_variable>
 
-#define __DEBUG_MESG
+// #define __DEBUG_MESG
+
+
+class semaphore {
+public:
+	semaphore()
+		: mSignal {false}
+                {}
+
+	template<class Rep, class Period>
+	bool take(std::chrono::duration<Rep, Period> wait)
+                {
+                        std::unique_lock<std::mutex> lock {mMutex};
+                        bool r {mCondVar.wait_for(lock, wait, [&]{return mSignal;})};
+                        mSignal = false;
+                        lock.unlock();
+                        return r;
+                }
+
+	void take()
+                {
+                        std::unique_lock<std::mutex> lock {mMutex};
+                        mCondVar.wait(lock, [&]{return mSignal;});
+                        mSignal = false;
+                }
+
+	void give()
+		{
+			{
+				std::unique_lock<std::mutex> lock {mMutex};
+				mSignal = true;
+			}
+			mCondVar.notify_one();
+		}
+
+private:
+	std::mutex mMutex;
+	std::condition_variable mCondVar;
+	bool mSignal;
+};
+
 
 struct data_t {
 	data_t(size_t sampling_time)
@@ -86,36 +128,46 @@ struct recorder_error_t {
 		{}
 
 	enum {
-		eInvalid_query
+		eInvalid_query,
+		eEmpty_data
 	};
 
 	int error_code;
 };
 
 struct RECORDER {
-	RECORDER(std::size_t min, std::size_t sampling_per_min)
-		: interval_min {min}, sampling_times_min {sampling_per_min}, head_idx {0}, data_length {0}, data(min, sampling_times_min)
+	RECORDER(std::size_t duration_in_min, std::size_t sampling_per_min, std::size_t shortest_period_min)
+		: duration_min {duration_in_min}, sampling_times_min {sampling_per_min}, minimum_judge_time_min {shortest_period_min},
+		  recording_idx {0}, head_idx {duration_min - 1}, data_length {0}, data(duration_in_min, sampling_times_min)
 		{}
 
-	std::size_t interval_min;
+	std::size_t duration_min;
 	std::size_t sampling_times_min;
-	std::size_t head_idx;
+	std::size_t minimum_judge_time_min;
+	std::size_t recording_idx; // point to present recording data_t
+	std::size_t head_idx;      // point to last complete sampling
 	std::size_t data_length;
 	std::vector<data_t> data;
+	semaphore   sem_sample_arrive;
 
-	/* Range: 1 ~ interval_min
+	/* Range: 1 ~ duration_min
 	 
 	   ----+--------------------+---> T (minute)
                ^                    ^
-          interval_min             Now (1)
+          duration_min             Now (1)
 
 	 */
 	data_t& open(std::size_t min_th);
+	data_t& open_1st();
+	data_t& open_last();
 	void save(uint16_t fuel_level);
-	size_t length();
+	size_t data_length_min();
+	bool new_sample_arrive();
+	size_t  start_judging_min();
+	int16_t level_change(uint16_t present_level, uint16_t old_level);
 
 	template<class Rep, class Period>
-	void sampling_interval(std::chrono::duration<Rep, Period> &r)
+	void get_sampling_interval(std::chrono::duration<Rep,Period> &r)
 		{
 			r = std::chrono::duration_cast<std::chrono::duration<Rep,Period>>(std::chrono::seconds {1}) / sampling_times_min;
 		}
@@ -124,20 +176,27 @@ struct RECORDER {
 data_t&
 RECORDER::open(std::size_t min_th)
 {
-	if(min_th == 0 || min_th > interval_min)
+	if(min_th == 0 || min_th > data_length || min_th > duration_min)
 		throw recorder_error_t {recorder_error_t::eInvalid_query};
+	
+	if(data_length == 0)
+		throw recorder_error_t {recorder_error_t::eEmpty_data};
 
 	size_t h {head_idx};
 	min_th--;
 	if(min_th > head_idx) {
 		min_th -= h;
-		h = interval_min - min_th;
+		h = duration_min - min_th;
 	}
 	else {
 		h -= min_th;
 	}
 
 	try {
+#ifdef __DEBUG_MESG
+		std::cerr << "recording idx: " << recording_idx;
+		std::cerr << "\thead idx: " << h << "\t";
+#endif
 		return data.at(h);
 	}
 	catch (std::out_of_range const &r) {
@@ -146,256 +205,107 @@ RECORDER::open(std::size_t min_th)
 	}
 }
 
+data_t&
+RECORDER::open_1st()
+{
+	return open(1);
+}
+
+data_t&
+RECORDER::open_last()
+{
+	return open(data_length);
+}
+
 void
 RECORDER::save(uint16_t lvl)
 {
-	data_t &min {data.at(head_idx)};
+	data_t &min {data.at(recording_idx)};
 	min.feed_sample(lvl);
 
 	if(min.freshed())
 	{
-		// Update header
+		// Update recording index
+		recording_idx++;
+		recording_idx %= duration_min;
+
 		head_idx++;
-		head_idx %= interval_min;
+		head_idx %= duration_min;
 
 		// Update data length
-		if(data_length < interval_min)
+		if(data_length < duration_min)
 			data_length++;
+
+		sem_sample_arrive.give();
 	}
 }
 
 size_t
-RECORDER::length()
+RECORDER::data_length_min()
 {
 	return data_length;
+}
+
+bool
+RECORDER::new_sample_arrive()
+{
+	return sem_sample_arrive.take(std::chrono::seconds {0});
+}
+
+size_t
+RECORDER::start_judging_min()
+{
+	return minimum_judge_time_min;
+}
+
+int16_t
+RECORDER::level_change(uint16_t present_level, uint16_t old_level)
+{
+	return present_level - old_level;
 }
 
 int
 main(int argc, char* argv[])
 {
 	constexpr size_t _60_minutes {60};
-	constexpr size_t sampling_time {3};
-	RECORDER fuelevel {_60_minutes, sampling_time};
+	constexpr size_t sampling_time {10};
+	constexpr size_t start_judge_min {1};
+	RECORDER fuelevel {_60_minutes, sampling_time, start_judge_min};
 
 	std::chrono::milliseconds ms;
-	fuelevel.sampling_interval(ms);
+	fuelevel.get_sampling_interval(ms);
 	std::cerr << "Sampling interval: " << ms.count() << "ms\n";
 	try {
-		for(uint16_t l=0; l<660; l++) {
+		for(uint16_t l=0; l<729; l++) {
 			fuelevel.save(l%121);
-			std::cerr << "Recorder length: " << fuelevel.length();
-			std::cerr << "\tHead idx: " << fuelevel.head_idx << std::endl;
-			if(fuelevel.head_idx == 59)
-				std::cerr << "here\n";
+			// std::cerr << "Recorder length: " << fuelevel.length();
+			// std::cerr << "\tHead idx: " << fuelevel.head_idx << std::endl;
+			if(fuelevel.new_sample_arrive()) {
+				std::cerr << "New sample arrive\n";
+				try {
+					if(fuelevel.data_length_min() >= fuelevel.start_judging_min()) {
+						std::cerr << "1st min FL: " << fuelevel.open(1).average << std::endl;
+						std::cerr << "Last min FL: " << fuelevel.open(fuelevel.data_length_min()).average << std::endl;
+						std::cerr << "1st min FL: " << fuelevel.open_1st().average << std::endl;
+						std::cerr << "Last min FL: " << fuelevel.open_last().average << std::endl;
+						std::cerr << "Level change: " << fuelevel.level_change(fuelevel.open_1st().average, fuelevel.open_last().average) << std::endl;
+					}
+				}
+				catch (recorder_error_t &err) {
+					std::cerr << "Got error\n";
+				}
+			}
 		}
+		std::cerr << "---------------------------------------------\n";
+		for(size_t i=1; i<=60; i++) {
+			if(i == 60)
+				std::cerr << i << "th min\t" << "\taverage: " << fuelevel.open(i).average << std::endl;
+		}
+
+		std::cerr << "\n1st min: " << fuelevel.open(1).average << std::endl;
+		std::cerr << "60th min: " << fuelevel.open(60).average << std::endl;
 	}
 	catch (...) {
 		std::cerr << "Got exception\n"; 
 	}
 }
-
-
-#if 0
-NONvolatile::NONvolatile(SECTOR &s, u16 maxNo)
-   : RECORDER(maxNo), mEeRegionAddr(s.start())
-{}
-
-
-void
-NONvolatile::init()
-{
-   if( !Eeprom.isOK() ) return;
-   uc16
-      headerAddr(msHeader_Addr + mEeRegionAddr),
-      lengthAddr(msLength_Addr + mEeRegionAddr);
-   
-   Eeprom.read(mHeader, headerAddr);
-   Eeprom.read(mLength, lengthAddr);
-   if(mHeader > maxNo()) {
-      __Warning("NONvolatile: reset header");
-      mHeader = 0;
-      Eeprom.write(mHeader, headerAddr);
-   }
-   if(mLength > maxNo()) {
-      __Warning("NONvolatile: reset length");
-      mLength = 0;
-      Eeprom.write(mLength, lengthAddr);
-   }
-   
-   if(mLength < maxNo() && mLength != mHeader) {
-      if(mLength > mHeader) {
-         mHeader = mLength;
-         Eeprom.write(mHeader, headerAddr);
-      }
-      else {
-         mLength = mHeader;
-         Eeprom.write(mLength, lengthAddr);
-      }
-   }
-   
-   mStartAddr = mEeRegionAddr + msLog_Addr;
-   RECORDER::init();
-}
-
-
-void
-NONvolatile::reset()
-{
-   RECORDER::reset();
-   saveHeader();
-   saveLength();
-}
-
-
-u16
-NONvolatile::_getNextAddr()
-{
-   u16 header(mHeader);
-   if(++header == maxNo()) header = 0;
-   return header * msSizeOfLog + mStartAddr;
-}
-
-
-u16
-NONvolatile::_getAddr(u16 serialNo)
-{
-   u16 header(mHeader);
-   --serialNo;
-   if(serialNo > header) {
-      serialNo -= header;
-      header = maxNo() - serialNo;
-   }
-   else {
-      header -= serialNo;
-   }
-   return header * msSizeOfLog + mStartAddr;
-}
-
-
-bool
-NONvolatile::save(u16 id, bool saveLenHead)
-{
-   if( !Eeprom.isOK() ) return false;
-   if(take() == false) { mSemErrW++; return false; }
-   Time t(System.time());
-   uc16 addr(_getNextAddr());
-   if(   !Eeprom.write(id, addr)
-      || !Eeprom.write(t, addr + sizeof(u16)) ) {
-         give();
-         return false;
-   }
-   updateHeader();
-   updateLength();
-   if(saveLenHead) saveHeader_Length();
-   give();
-   return true;
-}
-
-
-/****************************************************************
- * Function      :  open
- * Description   :  To get a log.
- *                  
- * Input         :  serial No. of log.
- *                  1: the latest one
- *
- * Output        :  true, grab successful
- *                  false, grab failed
- *
- * History       :  ysh 3-31-2010     created.
- ****************************************************************/
-bool
-NONvolatile::open(u16 serialNo, LOG &log)
-{
-   if( !Eeprom.isOK() ) return false;
-   if(serialNo == 0 || serialNo > mLength) return false;
-   if(take() == false) { mSemErrR++; return false; }
-   uc16 addr(_getAddr(serialNo));
-   bool 
-      r1(Eeprom.read(log.mId, addr)),
-      r2(Eeprom.read(log.mTime, addr + sizeof(u16)));
-   give();
-   return r1 && r2;
-}
-
-
-void
-NONvolatile::openByHeader(u16 h, LOG &log)
-{
-   if( !Eeprom.isOK() ) return;
-   if(h >= maxNo()) {
-      __Errmsg("Illegal header");
-      return;
-   }
-   if(take() == false) return;
-   uc16 addr(h * msSizeOfLog + mStartAddr);
-   if(   !Eeprom.read(log.mId, addr) 
-      || !Eeprom.read(log.mTime, addr + sizeof(u16)) ){
-         __Errmsg("Open log");
-      }
-   give();
-}
-
-
-void
-NONvolatile::saveHeader()
-{
-   for(int retry=10; retry>0; retry--)
-      if(Eeprom.write(mHeader, msHeader_Addr + mEeRegionAddr)) return;
-}
-
-
-void
-NONvolatile::saveLength()
-{
-   for(int retry=10; retry>0; retry--)
-      if(Eeprom.write(mLength, msLength_Addr + mEeRegionAddr)) return;
-}
-
-
-void
-NONvolatile::saveHeader_Length()
-{
-   uc32 headLeng(mHeader + (mLength << 16));
-
-   for(int retry=10; retry>0; retry--)
-      if(Eeprom.write(headLeng, msHeader_Addr + mEeRegionAddr)) return;
-}
-
-
-void
-NONvolatile::_testRW()
-{
-   LOG log;
-   for(u16 h=0; h<maxNo(); h++)
-   {
-      mHeader = h;
-      for(int i=1; i<=maxNo(); i++) {
-         if(!save(i)) puts("Log test save err\n\r");
-      }
-      int j(maxNo());
-      for(int i=1; i<=maxNo(); i++, j--) {
-         if(!open(i, log)) puts("Log test open err\n\r");
-         if(j != log.id()) printf("Logging error: %d\n\r", i);
-      }
-      printf("Log test round: %d\n\r", h);
-   }
-   puts("Log test done!");
-}
-
-
-void
-NONvolatile::_testPowerLost()
-{
-   printf("Header: %d Length: %d\n\r", mHeader, mLength);
-   save(0x20);
-}
-
-
-void
-NONvolatile::test()
-{
-   _testRW();
-   //_testPowerLost();
-}
-#endif

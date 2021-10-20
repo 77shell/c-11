@@ -50,9 +50,13 @@ BINS := hello \
 	catch_signals \
 	unordered_map
 
-.PHONY: impl
-impl: impl_pattern.cpp impl_pattern_test.cpp
+.PHONY: impl_pattern
+impl_pattern: impl_pattern.cpp impl_pattern_test.cpp
 	g++ -o$@ $^
+
+.PHONY: impl
+impl: impl.cpp impl.h impl_test.cpp
+	g++ -std=c++14 $^ -o $@
 
 .PHONY: all
 all: $(BINS)
@@ -61,7 +65,7 @@ all: $(BINS)
 #	$(CXX) -o $@ $< -lcan
 
 sha256: sha256.c
-	$(COMPILE.c) -o $@ $< -lcrypto
+	$(COMPILE.c) -o $@ $< -lcrypto -I~/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L~/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
 zip: zip.cpp
 	$(COMPILE.cc) -o $@ $< -lzip
@@ -77,10 +81,6 @@ cond_var: cond_var.cpp
 
 %: %.cpp
 	$(COMPILE.cc) -o$@ $< $(LIB)
-
-.PHONY: impl
-impl: impl.cpp impl.h impl_test.cpp
-	g++ -std=c++14 $^ -o $@
 
 .PHONY: clean
 clean:

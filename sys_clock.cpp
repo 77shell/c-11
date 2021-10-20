@@ -12,5 +12,4 @@ main(int argc, char *argv[])
 	const size_t str_buf_size {40};
 	char str_buf[str_buf_size];
 	std::strftime(str_buf, str_buf_size, "_%F_%H%M", std::localtime(&t));
-	cout << str_buf << endl;
 }

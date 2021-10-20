@@ -17,4 +17,10 @@ main(int argc, char *argv[])
         std::this_thread::sleep_for(1s);
         std::chrono::time_point<std::chrono::steady_clock> p1 {std::chrono::steady_clock::now()};
         std::cout << "Time elapse: " << std::chrono::duration_cast<std::chrono::milliseconds>(p1-p0).count() << "ms\n";
+
+	std::chrono::milliseconds s {3s};
+	std::chrono::milliseconds p {50ms};
+	std::chrono::milliseconds ms;
+
+	std::cout << "Count: " << ms.count() << "count: " << s.count() / p.count() << std::endl;;
 }
