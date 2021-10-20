@@ -67,8 +67,8 @@ all: $(BINS)
 deque: deque.cpp
 	$(COMPILE.cc) -o $@ $< -pthread
 
-sha256: sha256.c
-	$(COMPILE.c) -o $@ $< -lcrypto -I~/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L~/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
+sha256: sha256.cpp
+	$(COMPILE.cc) -o $@ $< -lssl -lcrypto -I~/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L~/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
 zip: zip.cpp
 	$(COMPILE.cc) -o $@ $< -lzip
