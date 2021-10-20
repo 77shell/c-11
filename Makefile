@@ -64,6 +64,9 @@ all: $(BINS)
 #receiver: receiver.o
 #	$(CXX) -o $@ $< -lcan
 
+deque: deque.cpp
+	$(COMPILE.cc) -o $@ $< -pthread
+
 sha256: sha256.c
 	$(COMPILE.c) -o $@ $< -lcrypto -I~/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L~/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
