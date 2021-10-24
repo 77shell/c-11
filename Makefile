@@ -73,8 +73,8 @@ sha256: sha256.cpp
 zip: zip.cpp
 	$(COMPILE.cc) -o $@ $< -lzip
 
-unzip: unzip.c
-	$(COMPILE.c) -o$@ $< -lzip
+unzip: unzip.cpp
+	$(COMPILE.cc) -o$@ $< -lzip
 
 cond_var: cond_var.cpp
 	$(CXX) -std=c++14 -pthread -o$@ $^

@@ -36,8 +36,6 @@ void test_fork_exec(void)
 		/* Child process */
 		execl("/bin/ls", "ls", (char *) 0);
 		perror("exec");
-		puts("<<<<<<<<< Child process >>>>>>>>>>>>>");
-		sleep(3);
 		fflush(NULL);
 		break;
 
@@ -62,6 +60,7 @@ void test_posix_spawn(void)
 	puts("Testing posix_spawn");
 	fflush(NULL);
 	status = posix_spawn(&pid, "/bin/ls", NULL, NULL, argv, environ);
+
 	if (status == 0) {
 		printf("Child id: %i\n", pid);
 		fflush(NULL);
