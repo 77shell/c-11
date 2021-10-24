@@ -136,6 +136,11 @@ unzip(const char *zip_file, const char *des_dirpath = nullptr)
 	return 0;
 }
 
+/*
+ * The limit of unzip_file:
+ *        target_file cannot be in directory, otherwise unzipping will fail.
+ *        Because currently, unzip_file doesn't support create directories in target_file.
+ */
 int
 unzip_file(const char *zip_file, const char *target_file, const char *des_dirpath = nullptr)
 {
@@ -188,10 +193,14 @@ unzip_file(const char *zip_file, const char *target_file, const char *des_dirpat
 
 	printf("---------------------------------\n");
 	printf("%s\t%lu\t%s\n", asctime_r(localtime_r(&st.mtime, &t), timestamp.get()), st.size, st.name);
-	write_to_file(zf, st.size, fname.get());
+	strcpy(fname.get(), path.c_str());
+	strcat(fname.get(), st.name);
+	int r = write_to_file(zf, st.size, fname.get());
+	if(r != 0)
+		fprintf(stderr, "%s: create %s failed! (%d)\n", __func__, fname.get(), r);
 
 	if (zip_close(za) == -1) {
-		fprintf(stderr, "%s: can't close zip `%s'\n", __func__, zip_file);
+		fprintf(stderr, "%s: can't close zip '%s'\n", __func__, zip_file);
 		return -eUNZIP_err_close_zipfile;
 	}
 
@@ -201,11 +210,19 @@ unzip_file(const char *zip_file, const char *target_file, const char *des_dirpat
 int main(int argc, char *argv[])
 {
 	const char *prg {argv[0]};
-	if(argc != 2) {
+	if(argc == 2) {
+		unzip(argv[1]);
+	}
+	else if(argc == 3) {
+		if(unzip_file(argv[1], argv[2]) != 0)
+			fprintf(stderr, "Extract %s failed!\n", argv[2]);
+	}
+	else {
 		fprintf(stderr, "usage: %s archive.zip\n", prg);
 		return 1;
 	}
- 
+
+#if 0
 	int err;
 	const char *archive = argv[1];
 	struct zip *za = zip_open(archive, 0, &err);
@@ -263,9 +280,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "%s: can't close zip archive `%s'/n", prg, archive);
 		return 1;
 	}
-
-	unzip(argv[1], "./xxxxx");
-	unzip_file(argv[1], "dir/sha256");
+#endif
  
 	return 0;
 }
