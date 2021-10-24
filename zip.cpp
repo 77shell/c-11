@@ -1,51 +1,69 @@
 
 /*
-  Compile file: -lzip
-
-  * Test 
-  Extract file (setpoint.db-export_2021-09-05_2125.sha) in zip file (setpoint.db-export.zip)
-
-  $ ./zip setpoint.db-export.zip setpoint.db-export_2021-09-05_2125.sha
-
+ * Pack files into a zip-file
+ *
  */
 
 #include <zip.h>
+#include <errno.h>
 
-int main(int argc, char *argv[])
+enum zip_error_e {
+	eZIP_ok,
+	eZIP_err_create_zipfile,
+	eZIP_err_mkdir,
+	eZIP_err_create_file,
+	eZIP_err_add_file,
+	eZIP_err_read_file,
+	eZIP_err_close_zipfile,
+	eZIP_err_invalid_filename,
+	eZIP_err_nofile_exist
+};
+
+
+int
+zip(const char *zip_archive, const char *new_file)
+{
+	if(!new_file) {
+		return eZIP_err_invalid_filename;
+	}
+
+	int err;
+	struct zip *za = zip_open(zip_archive, ZIP_CREATE, &err);
+	if(za == nullptr) {
+		constexpr size_t buflen {64};
+		char errstr[buflen];
+		zip_error_to_str(errstr, buflen, err, errno);
+		fprintf(stderr, "%s: can't create '%s': %s\n", __func__, zip_archive, errstr);
+		return -eZIP_err_create_zipfile;
+	}
+
+	{
+		zip_error_t err;
+		zip_source_t *zs = zip_source_file_create(new_file, 0, 0, &err);
+		if(zs == nullptr) {
+			zip_close(za);
+			return -eZIP_err_create_file;
+		}
+
+		if(zip_file_add(za, new_file, zs, ZIP_FL_OVERWRITE | ZIP_FL_ENC_GUESS) == -1) {
+			zip_source_free(zs);
+			zip_close(za);
+			return eZIP_err_add_file;
+		}
+	}
+
+	zip_close(za);
+	return 0;
+}
+
+int
+main(int argc, char *argv[])
 {
 	if(argc < 3) {
 		fprintf(stderr, "usage: %s zip-file target-file\n", argv[0]);
 		return 1;
 	}
 
-	// Open the ZIP archive
-	int err = 0;
-	zip *z = zip_open(argv[1], 0, &err);
-
-	// Search for the file of given name
-	const char *name = argv[2];
-	struct zip_stat st;
-	zip_stat_init(&st);
-	zip_stat(z, name, 0, &st);
-
-	// Alloc memory for its uncompressed contents
-	uint8_t *contents = new uint8_t[st.size];
-
-	// Read the compressed file
-	zip_file *f = zip_fopen(z, name, 0);
-	zip_fread(f, contents, st.size);
-	fprintf(stderr, "%s file size: %ld\n", argv[2], st.size);
-	zip_fclose(f);
-
-	// And close the archive
-	zip_close(z);
-
-	// Do something with the contents
-
-	// delete allocated memory
-	for(unsigned long int i=0; i<st.size; i++)
-		fprintf(stderr, "%02x ", contents[i]);
-
-	delete[] contents;
+	zip(argv[1], argv[2]);
 }
 
