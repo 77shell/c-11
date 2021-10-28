@@ -9,6 +9,7 @@
 #include <string.h>
 #include <gdbm.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 enum zip_error_e {
 	eZIP_ok,
@@ -115,29 +116,61 @@ write_random_data(FILE *fp)
 	printf("Wrote %ld-byte\n", w);
 }
 
-static FILE*
+static int
 dump_dbm(GDBM_FILE dbm, FILE *fp)
 {
 	int r = gdbm_dump_to_file(dbm, fp, GDBM_DUMP_FMT_ASCII);
 	if(r != 0) {
 		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
 	}
-	return fp;
+	return r;
 }
 
 static GDBM_FILE
 open_dbm(const char *dbm_path)
 {
 	GDBM_FILE dbm;
-        static const int block_size = 4096;
-        if( (dbm = gdbm_open(dbm_path, block_size,
-			       GDBM_READER, 0666, nullptr)) == nullptr)
+        static const int block_size {4096};
+        if( (dbm = gdbm_open(dbm_path, block_size, GDBM_READER, 0666, nullptr)) == nullptr)
         {
+		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
                 perror("gdbm_open");
         }
 	return dbm;
 }
 
+static void
+zip_gdbm(char *argv[])
+{
+	GDBM_FILE dbm = open_dbm("./setpoint.db");
+	if(!dbm) {
+		exit(0);
+	}
+
+	FILE *fp = _create_temp_file();
+	if(!fp) {
+		perror("Create temp file");
+		exit(0);
+	}
+
+	if(dump_dbm(dbm, fp)) {
+		exit(0);
+	}
+
+	//write_random_data(fp);
+	zip_filep(argv[1], fp, argv[2]);
+	if(gdbm_close(dbm) != 0) {
+		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
+	}
+
+	char fname[FILENAME_MAX], link[FILENAME_MAX] = {0};
+	sprintf(fname, "/proc/self/fd/%d", fileno(fp));
+	printf("%s\n", fname);
+	if(readlink(fname, link, sizeof link - 1) > 0)
+		printf("File name: %s\n", link);
+
+	//fclose(fp);
+}
 
 int
 main(int argc, char *argv[])
@@ -147,16 +180,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	// zip(argv[1], argv[2]);
-
-	FILE *fp = _create_temp_file();
-	GDBM_FILE dbm = open_dbm("./setpoint.db");
-	if(!dbm) {
-		exit(0);
-	}
-	//write_random_data(fp);
-	zip_filep(argv[1], fp, argv[2]);
-	if(gdbm_close(dbm) != 0) {
-		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
-	}
+	//zip(argv[1], argv[2]);
+	zip_gdbm(argv);
+	sleep(300);
 }
