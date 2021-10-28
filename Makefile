@@ -71,7 +71,7 @@ sha256: sha256.cpp
 	$(COMPILE.cc) -o $@ $< -lssl -lcrypto -I~/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L~/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
 zip: zip.cpp
-	$(COMPILE.cc) -o $@ $< -lzip
+	$(COMPILE.cc) -o $@ $< -lzip -lgdbm -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include
 
 unzip: unzip.cpp
 	$(COMPILE.cc) -o$@ $< -lzip
