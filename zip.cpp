@@ -81,13 +81,18 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 	{
 		rewind(filep);
 		zip_error_t err;
+		zip_error_init(&err);
 		zip_source_t *zs = zip_source_filep_create(filep, 0, 0, &err);
 		if(zs == nullptr) {
+			printf("%s: %s\n", __func__, zip_error_strerror(&err));
 			zip_close(za);
+			zip_error_fini(&err);
 			return -eZIP_err_create_file;
 		}
+		zip_error_fini(&err);
 
 		if(zip_file_add(za, filename, zs, ZIP_FL_OVERWRITE | ZIP_FL_ENC_GUESS) == -1) {
+			/* filep will be closed after a successful adding */
 			zip_source_free(zs);
 			zip_close(za);
 			return eZIP_err_add_file;
@@ -104,6 +109,13 @@ _create_temp_file()
 	FILE *fp = tmpfile();
 	if(fp == NULL)
 		perror(__func__);
+
+	char fname[FILENAME_MAX], link[FILENAME_MAX] = {0};
+	sprintf(fname, "/proc/self/fd/%d", fileno(fp));
+	printf("%s\n", fname);
+	if(readlink(fname, link, sizeof link - 1) > 0)
+		printf("File name: %s\n", link);
+
 	return fp;
 }
 
@@ -163,12 +175,6 @@ zip_gdbm(char *argv[])
 		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
 	}
 
-	char fname[FILENAME_MAX], link[FILENAME_MAX] = {0};
-	sprintf(fname, "/proc/self/fd/%d", fileno(fp));
-	printf("%s\n", fname);
-	if(readlink(fname, link, sizeof link - 1) > 0)
-		printf("File name: %s\n", link);
-
 	//fclose(fp);
 }
 
@@ -182,5 +188,4 @@ main(int argc, char *argv[])
 
 	//zip(argv[1], argv[2]);
 	zip_gdbm(argv);
-	sleep(300);
 }

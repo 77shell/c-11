@@ -51,14 +51,19 @@ write_to_file(zip_file *zf, zip_uint64_t fsize, const char *f)
 {
 	std::unique_ptr<char[]> rbuf {new char [BUFSIZ]};
 	int fd = open(f, O_RDWR | O_TRUNC | O_CREAT, 0644);
-	if(fd < 0)
+	if(fd < 0) {
+		printf("open %s failed\n", f);
 		return -eUNZIP_err_create_file;
+	}
  
 	zip_uint64_t sum {0};
 	while(sum != fsize) {
 		zip_int64_t len = zip_fread(zf, rbuf.get(), BUFSIZ);
-		if(len < 0)
+		if(len < 0) {
+			zip_error *ptr = zip_file_get_error(zf);
+			printf("f_read fail(%ld): zip_err %d, sys_err %d %s\n", len, ptr->zip_err, ptr->sys_err, zip_error_strerror(ptr));
 			return -eUNZIP_err_read_file;
+		}
 
 		write(fd, rbuf.get(), len);
 		sum += len;
@@ -68,9 +73,39 @@ write_to_file(zip_file *zf, zip_uint64_t fsize, const char *f)
 	return 0;
 }
 
+static void
+print_valid_stat(zip_stat_t *sb)
+{
+	constexpr zip_uint64_t valid_field[] = {
+		ZIP_STAT_NAME,
+		ZIP_STAT_INDEX,
+		ZIP_STAT_SIZE,
+		ZIP_STAT_COMP_SIZE,
+		ZIP_STAT_MTIME,
+		ZIP_STAT_CRC,
+		ZIP_STAT_COMP_METHOD,
+		ZIP_STAT_ENCRYPTION_METHOD
+	};
+
+	constexpr const char *field_name[] = {
+		"ZIP_STAT_NAME",
+		"ZIP_STAT_INDEX",
+		"ZIP_STAT_SIZE",
+		"ZIP_STAT_COMP_SIZE",
+		"ZIP_STAT_MTIME",
+		"ZIP_STAT_CRC",
+		"ZIP_STAT_COMP_METHOD",
+		"ZIP_STAT_ENCRYPTION_METHOD"
+	};
+	printf("Vaild: %lX\n", sb->valid);
+	for(int i = 0; i < sizeof valid_field / sizeof(zip_uint64_t); i++)
+		printf("%s %s\n", field_name[i], (sb->valid & valid_field[i]) ? "Valid" : "Invalid");
+}
+
 int
 unzip(const char *zip_file, const char *des_dirpath = nullptr)
 {
+	printf("%s\n", __func__);
 	int err;
 	struct zip *za = zip_open(zip_file, 0, &err);
 	if(za == NULL) {
@@ -108,8 +143,8 @@ unzip(const char *zip_file, const char *des_dirpath = nullptr)
 	{
 		if(zip_stat_index(za, i, 0, &st) == 0) {
 			printf("---------------------------------\n");
-			printf("%s\t%lu\t%s\n", asctime_r(localtime_r(&st.mtime, &t), timestamp.get()), st.size, st.name);
-			
+			printf("%s\t%lu\t%s\tCRC %X\t\n", asctime_r(localtime_r(&st.mtime, &t), timestamp.get()), st.size, st.name, st.crc);
+			print_valid_stat(&st);
 			strcpy(fname.get(), path.c_str());
 			size_t l {strlen(st.name)};
 			strcat(fname.get(), st.name);
@@ -119,8 +154,10 @@ unzip(const char *zip_file, const char *des_dirpath = nullptr)
 				safe_create_dir(fname.get());
 			} else {
 				struct zip_file *zf = zip_fopen_index(za, i, 0);
-				if(!zf)
+				if(!zf) {
+					printf("zip_fopen_index error!\n");
 					return -eUNZIP_err_open_file;
+				}
 				write_to_file(zf, st.size, fname.get());
 			}
 		} else {
@@ -184,6 +221,7 @@ unzip_file(const char *zip_file, const char *target_file, const char *des_dirpat
 
 	zip_stat_init(&st);
 	if(zip_stat(za, target_file, 0, &st) == -1) {
+		printf("zip_stat error!\n");
 		return -eUNZIP_err_nofile_exist;
 	}
 
@@ -192,7 +230,7 @@ unzip_file(const char *zip_file, const char *target_file, const char *des_dirpat
 		return -eUNZIP_err_open_file;
 
 	printf("---------------------------------\n");
-	printf("%s\t%lu\t%s\n", asctime_r(localtime_r(&st.mtime, &t), timestamp.get()), st.size, st.name);
+	printf("%s\t%lu\t%s\tCRC %X\t\n", asctime_r(localtime_r(&st.mtime, &t), timestamp.get()), st.size, st.name, st.crc);
 	strcpy(fname.get(), path.c_str());
 	strcat(fname.get(), st.name);
 	int r = write_to_file(zf, st.size, fname.get());
