@@ -26,8 +26,7 @@ include ./Makefile.inc
 
 
 INCLUDEPATH += -iquote$(SRC_ROOT)/include
-LIBSPATH = -L$(SRC_ROOT)/ \
-	-L/usr/lib -Wl,-rpath,/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib
+LIBSPATH = -Wl,-rpath,/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
 
 CXXFLAGS += $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
@@ -68,7 +67,7 @@ deque: deque.cpp
 	$(COMPILE.cc) -o $@ $< -pthread
 
 sha256: sha256.cpp
-	$(COMPILE.cc) -o $@ $< -lssl -lcrypto -I~/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L~/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
+	$(COMPILE.cc) -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include  -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64 -o$@ $< -lcrypto -lssl -lgdbm -ldl
 
 zip: zip.cpp
 	$(COMPILE.cc) -o $@ $< -lzip -lgdbm -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include

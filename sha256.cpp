@@ -7,6 +7,8 @@
 #include <cstring>
 #include <string>
 #include <memory>
+#include <gdbm.h>
+#include <unistd.h>
 
 static void digest_message(const unsigned char *message, size_t message_len, unsigned char **digest, unsigned int *digest_len);
 static void digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len);
@@ -15,6 +17,7 @@ namespace util {
 
 	struct SHA256 {
 		SHA256(const char *file);
+		SHA256(FILE *);
 		~SHA256();
 
 		std::string digest() const;
@@ -26,6 +29,7 @@ namespace util {
 		 * 0<: failed
 		 */
 		int write_to_file(const char *file_path);
+		int write_to_filep(FILE *out_fp);
 
 		/*
 		 * 0: equal
@@ -50,6 +54,30 @@ struct SHA256::impl_t {
 			f = fopen(file, "r");
 			if (!f) {
 				fprintf(stderr, "%s: couldn't open %s\n", __func__, file);
+				return;
+			}
+
+			fseek(f, 0L, SEEK_END);
+			f_len = ftell(f);
+			if(f_len == -1L) {
+				perror("Get file size");
+				return;
+			}
+			printf("File size: %ld\n", f_len);
+			rewind(f);
+
+			if((mdctx = EVP_MD_CTX_new()) == NULL)
+				return;
+
+			digest_message();
+			format_digest();
+		}
+
+	impl_t(FILE *fp)
+		: f {fp}, f_len {0}, digest {nullptr}, digest_len {0}, mdctx {nullptr}, message_buf {new unsigned char [BUFSIZ]}
+		{
+			if (!f) {
+				fprintf(stderr, "%s: couldn't open FILE descriptor %d\n", __func__, fileno(f));
 				return;
 			}
 
@@ -135,6 +163,10 @@ SHA256::SHA256(const char *file)
 	: mp_Impl {new impl_t {file}}
 {}
 
+SHA256::SHA256(FILE *fp)
+	: mp_Impl {new impl_t {fp}}
+{}
+
 SHA256::~SHA256() {
 	mp_Impl.reset();
 }
@@ -171,6 +203,25 @@ SHA256::write_to_file(const char *file_path)
 
 	fwrite(mp_Impl->digest, sizeof(unsigned char), mp_Impl->digest_len, f);
 	fclose(f);
+
+	printf("%s: Digest len %d-byte\n", __func__, mp_Impl->digest_len);
+	for(unsigned int len=0; len<mp_Impl->digest_len; len++)
+		fprintf(stderr, "%02x", mp_Impl->digest[len]);
+	putchar('\n');
+
+	return 0;
+}
+
+int
+SHA256::write_to_filep(FILE *out_fp)
+{
+	if(!out_fp) {
+		fprintf(stderr, "%s: couldn't open file descriptor %d\n", __func__, fileno(out_fp));
+		perror(__func__);
+		return -1;
+	}
+
+	fwrite(mp_Impl->digest, sizeof(unsigned char), mp_Impl->digest_len, out_fp);
 
 	printf("%s: Digest len %d-byte\n", __func__, mp_Impl->digest_len);
 	for(unsigned int len=0; len<mp_Impl->digest_len; len++)
@@ -361,6 +412,67 @@ digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len)
 	EVP_MD_CTX_free(mdctx);
 }
 
+static FILE*
+_create_temp_file()
+{
+	FILE *fp = tmpfile();
+	if(fp == NULL)
+		perror(__func__);
+
+	char fname[FILENAME_MAX], link[FILENAME_MAX] = {0};
+	sprintf(fname, "/proc/self/fd/%d", fileno(fp));
+	printf("%s\n", fname);
+	if(readlink(fname, link, sizeof link - 1) > 0)
+		printf("File name: %s\n", link);
+
+	return fp;
+}
+
+static int
+dump_dbm(GDBM_FILE dbm, FILE *fp)
+{
+	int r = gdbm_dump_to_file(dbm, fp, GDBM_DUMP_FMT_ASCII);
+	if(r != 0) {
+		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
+	}
+	return r;
+}
+
+static GDBM_FILE
+open_dbm(const char *dbm_path)
+{
+	GDBM_FILE dbm;
+        static const int block_size {4096};
+        if( (dbm = gdbm_open(dbm_path, block_size, GDBM_READER, 0666, nullptr)) == nullptr)
+        {
+		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
+                perror("gdbm_open");
+        }
+	return dbm;
+}
+
+static void
+sha_filep_test()
+{
+	GDBM_FILE dbm = open_dbm("./setpoint.db");
+	if(!dbm) {
+		exit(0);
+	}
+
+	FILE *fp = _create_temp_file();
+	if(!fp) {
+		perror("Create temp file");
+		exit(0);
+	}
+
+	if(dump_dbm(dbm, fp)) {
+		exit(0);
+	}
+
+	util::SHA256 sha {fp};
+	printf("setpoint.db SHA256 %s\n", sha.digest().c_str());
+}
+
 int main(int argc, char **argv)
 {
 	unsigned char buffer[BUFSIZ];
@@ -416,6 +528,11 @@ int main(int argc, char **argv)
 	 * Write digest to file
 	 */
 	sha256.write_to_file(argv[2]);
+
+	/*----------------------------------------------------
+	 * FILE test
+	 */
+	sha_filep_test();
 	return 0;
 }
 
