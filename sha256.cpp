@@ -471,6 +471,9 @@ sha_filep_test()
 
 	util::SHA256 sha {fp};
 	printf("setpoint.db SHA256 %s\n", sha.digest().c_str());
+	FILE *out_f = fopen("SHA.txt", "w+");
+	sha.write_to_filep(out_f);
+	fclose(out_f);
 }
 
 int main(int argc, char **argv)
