@@ -10,6 +10,7 @@
 #include <gdbm.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string>
 
 enum zip_error_e {
 	eZIP_ok,
@@ -21,9 +22,90 @@ enum zip_error_e {
 	eZIP_err_close_zipfile,
 	eZIP_err_invalid_filename,
 	eZIP_err_invalid_filep,
-	eZIP_err_nofile_exist
+	eZIP_err_nofile_exist,
+	eZIP_err_null_archive
 };
 
+struct ZIP {
+	ZIP(const char *path_name)
+	{
+		int err;
+		zip_arch = zip_open(path_name, ZIP_CREATE, &err);
+		if(zip_arch == nullptr) {
+			constexpr size_t buflen {64};
+			char errstr[buflen];
+			zip_error_to_str(errstr, buflen, err, errno);
+			fprintf(stderr, "%s: can't create '%s': %s\n", __func__, path_name, errstr);
+			// return -eZIP_err_create_zipfile;
+		}
+		else {
+			printf("Open archive: %s\n", path_name);
+		}
+	}
+
+	~ZIP() {
+		zip_error_fini(&zip_err);
+		if(zip_arch)
+			zip_close(zip_arch);
+		printf("%s\n", __func__);
+	}
+
+	int add_file(const char *path_fname) {
+		if(!zip_arch)
+			return -eZIP_err_null_archive;
+
+		if(!path_fname)
+			return -eZIP_err_invalid_filename;
+
+		zip_error_init(&zip_err);
+		zip_source_t *zs = zip_source_file_create(path_fname, 0, 0, &zip_err);
+		if(zs == nullptr) {
+			return -eZIP_err_create_file;
+		}
+
+		if(zip_file_add(zip_arch, path_fname, zs, ZIP_FL_OVERWRITE | ZIP_FL_ENC_GUESS) == -1) {
+			zip_source_free(zs);
+			return -eZIP_err_add_file;
+		}
+		return 0;
+	}
+
+	int add_filep(FILE *fp, const char *zfile_name) {
+		if(!zip_arch)
+			return -eZIP_err_null_archive;
+
+		if(!fp)
+			return -eZIP_err_invalid_filep;
+
+		rewind(fp);
+		zip_error_init(&zip_err);
+		zip_source_t *zs = zip_source_filep_create(fp, 0, 0, &zip_err);
+		if(zs == nullptr) {
+			printf("%s: %s\n", __func__, zip_error_strerror(&zip_err));
+			return -eZIP_err_create_file;
+		}
+
+		if(zip_file_add(zip_arch, zfile_name, zs, ZIP_FL_OVERWRITE | ZIP_FL_ENC_GUESS) == -1) {
+			zip_source_free(zs);
+			return -eZIP_err_add_file;
+		}
+		printf("%s: %s\n", __func__, zip_error_strerror(&zip_err));
+
+		// int fno {fileno(fp)};
+		// if(fno == -1)
+		// 	perror("fileno()");
+		// else {
+		// 	printf("file no %d\n", fno);
+		// 	if(fclose(fp) != 0)
+		// 		perror("fclose");
+		// }
+		return 0;
+	}
+
+private:
+	struct zip *zip_arch;
+	zip_error_t zip_err;
+};
 
 int
 zip(const char *zip_archive, const char *new_file)
@@ -65,6 +147,7 @@ int
 zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 {
 	if(!filep) {
+		printf("Invalid filep\n");
 		return eZIP_err_invalid_filep;
 	}
 
@@ -82,6 +165,7 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 		rewind(filep);
 		zip_error_t err;
 		zip_error_init(&err);
+		printf("zip_source_filep_create()\n");
 		zip_source_t *zs = zip_source_filep_create(filep, 0, 0, &err);
 		if(zs == nullptr) {
 			printf("%s: %s\n", __func__, zip_error_strerror(&err));
@@ -91,12 +175,14 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 		}
 		zip_error_fini(&err);
 
+		printf("zip_file_add()\n");
 		if(zip_file_add(za, filename, zs, ZIP_FL_OVERWRITE | ZIP_FL_ENC_GUESS) == -1) {
-			/* filep will be closed after a successful adding */
 			zip_source_free(zs);
 			zip_close(za);
+			printf("Add file failed\n");
 			return eZIP_err_add_file;
 		}
+		printf("%s: %s\n", __func__, zip_error_strerror(&err));
 	}
 
 	zip_close(za);
@@ -154,6 +240,7 @@ open_dbm(const char *dbm_path)
 static void
 zip_gdbm(char *argv[])
 {
+	printf("%s\n", __func__);
 	GDBM_FILE dbm = open_dbm("./setpoint.db");
 	if(!dbm) {
 		exit(0);
@@ -171,11 +258,63 @@ zip_gdbm(char *argv[])
 
 	//write_random_data(fp);
 	zip_filep(argv[1], fp, argv[2]);
+
+	// int fno {fileno(fp)};
+	// if(fno == -1) {
+	// 	perror("fileno()");
+	// }
+	// else {
+	// 	printf("file no %d\n", fno);
+	// 	if(fclose(fp) != 0)
+	// 		perror("fclose");
+	// }
+
+	if(gdbm_close(dbm) != 0) {
+		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
+	}
+}
+
+
+static void
+zip_gdbm2(char *argv[])
+{
+	printf("%s\n", __func__);
+	GDBM_FILE dbm = open_dbm("./setpoint.db");
+	if(!dbm) {
+		exit(0);
+	}
+
+	FILE *fp = _create_temp_file();
+	if(!fp) {
+		perror("Create temp file");
+		exit(0);
+	}
+
+	if(dump_dbm(dbm, fp)) {
+		exit(0);
+	}
+
+	std::string name {argv[1]};
+	name += "v2";
+	ZIP zip {name.c_str()};
+	if(zip.add_filep(fp, argv[2]) != 0) {
+		printf("add_filep %s failed\n", argv[2]);
+	}
+
 	if(gdbm_close(dbm) != 0) {
 		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
 	}
 
-	//fclose(fp);
+	// if(fp) {
+	// 	int fno {fileno(fp)};
+	// 	if(fno == -1)
+	// 		perror("fileno()");
+	// 	else {
+	// 		printf("file no %d\n", fno);
+	// 		if(fclose(fp) != 0)
+	// 			perror("fclose");
+	// 	}
+	// }
 }
 
 int
@@ -188,4 +327,5 @@ main(int argc, char *argv[])
 
 	//zip(argv[1], argv[2]);
 	zip_gdbm(argv);
+	zip_gdbm2(argv);
 }

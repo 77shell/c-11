@@ -27,7 +27,7 @@ include ./Makefile.inc
 
 INCLUDEPATH += -iquote$(SRC_ROOT)/include
 LIBSPATH = -L$(SRC_ROOT)/ \
-	-L/usr/lib -Wl,-rpath,/usr/local/lib
+	-L/usr/lib -Wl,-rpath,/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib
 
 
 CXXFLAGS += $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
