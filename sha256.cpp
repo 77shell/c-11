@@ -9,9 +9,10 @@
 #include <memory>
 #include <gdbm.h>
 #include <unistd.h>
+#include <fcntl.h>
 
-static void digest_message(const unsigned char *message, size_t message_len, unsigned char **digest, unsigned int *digest_len);
-static void digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len);
+static void digest_message(const unsigned char *message, size_t message_len, unsigned char *digest, unsigned int *digest_len);
+static void digest_message_file(FILE *f, unsigned char *digest, unsigned int *digest_len);
 
 namespace util {
 
@@ -272,7 +273,7 @@ SHA256::compare(const void *sha_data)
 		: 1;
 }
 
-static int digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len, EVP_MD_CTX **);
+static int digest_message_file(FILE *f, unsigned char *digest, unsigned int *digest_len, EVP_MD_CTX **);
 
 int
 sha256sum(const char *in_filepath, const char *out_filepath)
@@ -284,10 +285,10 @@ sha256sum(const char *in_filepath, const char *out_filepath)
 		return 1;
 	}
 
-	unsigned char *digest {nullptr};
+	unsigned char digest[EVP_MAX_MD_SIZE];
 	unsigned int digest_len;
 	EVP_MD_CTX *mdctx {nullptr};
-	int r = digest_message_file(f, &digest, &digest_len, &mdctx);
+	int r = digest_message_file(f, digest, &digest_len, &mdctx);
 	if(r)
 		printf("%s: calculate %s failed!", __func__, in_filepath);
 
@@ -321,7 +322,7 @@ sha256sum(const char *in_filepath, const char *out_filepath)
 }
 
 static int
-digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len, EVP_MD_CTX **pmdctx)
+digest_message_file(FILE *f, unsigned char *digest, unsigned int *digest_len, EVP_MD_CTX **pmdctx)
 {
 	EVP_MD_CTX *mdctx = *pmdctx;
 	if((mdctx = EVP_MD_CTX_new()) == NULL)
@@ -351,10 +352,7 @@ digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len, E
 			flen = 0;
 	} while(flen);
 
-	if((*digest = (unsigned char *)OPENSSL_malloc(EVP_MD_size(EVP_sha256()))) == NULL)
-		return -5;
-
-	if(1 != EVP_DigestFinal_ex(mdctx, *digest, digest_len))
+	if(1 != EVP_DigestFinal_ex(mdctx, digest, digest_len))
 		return -6;
 
 	return 0;
@@ -367,7 +365,7 @@ handleErrors()
 }
 
 static void
-digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len)
+digest_message_file(FILE *f, unsigned char *digest, unsigned int *digest_len)
 {
 	fseek(f, 0L, SEEK_END);
 	long flen = ftell(f);
@@ -403,10 +401,7 @@ digest_message_file(FILE *f, unsigned char **digest, unsigned int *digest_len)
 			flen = 0;
 	} while(flen);
 
-	if((*digest = (unsigned char *)OPENSSL_malloc(EVP_MD_size(EVP_sha256()))) == NULL)
-		handleErrors();
-
-	if(1 != EVP_DigestFinal_ex(mdctx, *digest, digest_len))
+	if(1 != EVP_DigestFinal_ex(mdctx, digest, digest_len))
 		handleErrors();
 
 	EVP_MD_CTX_free(mdctx);
@@ -435,6 +430,12 @@ dump_dbm(GDBM_FILE dbm, FILE *fp)
 	if(r != 0) {
 		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
 	}
+
+	r = gdbm_dump(dbm,               /* GDBM_FILE  */
+		      "dump-ascii.dbm", /* filename   */
+		      GDBM_DUMP_FMT_ASCII, /* format     */
+		      GDBM_WRCREAT,        /* open_flags */
+		      O_CREAT | S_IRGRP | S_IRUSR | S_IROTH); /* mode, set to read permissions */
 	return r;
 }
 
