@@ -76,11 +76,22 @@ struct ZIP {
 		if(!fp)
 			return -eZIP_err_invalid_filep;
 
+		fseek(fp, 0L, SEEK_END);
+		long f_len = ftell(fp);
+		if(f_len == -1L) {
+			perror("Get file size");
+			return -eZIP_err_create_file;
+		}
+		else {
+			printf("File len: %ld\n", f_len);
+		}
+
 		rewind(fp);
 		int r {eZIP_ok};
 		zip_error_t err;
 		zip_error_init(&err);
 		zip_source_t *zs = zip_source_filep_create(fp, 0, 0, &err);
+
 		if(zs == nullptr) {
 			printf("%s: %s\n", __func__, zip_error_strerror(&err));
 			zip_error_fini(&err);
@@ -117,6 +128,7 @@ struct ZIP {
 		else {
 			printf("Open archive: %s\n", path_zarch);
 		}
+
 		return 0;
 	}
 
@@ -169,8 +181,10 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 		return eZIP_err_invalid_filep;
 	}
 
+	printf("---------> Open zip archive: %s\n", zip_archive);
+
 	int err;
-	struct zip *za = zip_open(zip_archive, ZIP_CREATE, &err);
+	zip_t *za = zip_open(zip_archive, ZIP_CREATE, &err);
 	if(za == nullptr) {
 		constexpr size_t buflen {64};
 		char errstr[buflen];
@@ -180,6 +194,16 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 	}
 
 	{
+		fseek(filep, 0L, SEEK_END);
+		long f_len = ftell(filep);
+		if(f_len == -1L) {
+			perror("Get file size");
+			return -eZIP_err_create_file;
+		}
+		else {
+			printf("File len: %ld\n", f_len);
+		}
+
 		rewind(filep);
 		zip_error_t err;
 		zip_error_init(&err);
@@ -357,7 +381,9 @@ main(int argc, char *argv[])
 	}
 
 	//zip(argv[1], argv[2]);
+
 	zip_gdbm(argv);
 	printf("\n-------------\n");
 	zip_gdbm2(argv);
+	sleep(2);
 }
