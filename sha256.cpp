@@ -537,6 +537,11 @@ int main(int argc, char **argv)
 	 * FILE test
 	 */
 	sha_filep_test();
+
+	/*----------------------------------------------------
+	 * Test copy test
+	 */
+	util::SHA256 sha256_2 = sha256;
 	return 0;
 }
 
