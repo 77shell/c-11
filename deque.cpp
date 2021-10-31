@@ -43,6 +43,20 @@ struct queue_t {
 			return r;
 		}
 
+	void push(T &&data)
+		{
+			bool notify;
+			{
+				std::lock_guard<std::mutex> lck {mtx};
+				notify = qu.empty();
+				qu.push_back(std::move(data));
+			}
+			if(notify) {
+				cv.notify_all();
+				std::this_thread::yield();
+			}
+		}
+
 	void push(T &data)
 		{
 			bool notify;
@@ -63,16 +77,20 @@ private:
 	std::condition_variable cv;
 };
 
-queue_t<int> Q;
+struct S_t {
+	int i;
+	S_t *p;
+};
+queue_t<S_t> Q;
 using namespace std::chrono_literals;
 
 void
 W()
 {
-	int in;
+	int input;
 	for(int i=0;;i++) {
-		//std::cin >> in;
-		Q.push(i);
+		std::cin >> input;
+		Q.push(S_t {input, nullptr});
 		std::cin.clear();
 		std::this_thread::sleep_for(1s);
 	}
@@ -83,19 +101,19 @@ R1()
 {
 	for(;;)
 	{
-		int i {Q.pop()};
-		std::cerr << __func__ << "\t" << i << std::endl;
+		S_t i {Q.pop()};
+		std::cerr << __func__ << "\t" << i.i << std::endl;
 	}
 }
 
 void
 R2()
 {
-	int i;
+	S_t i;
 	for(;;)
 	{
 		if(Q.try_pop(i, 300ms))
-			std::cerr << __func__ << "\t" << i;
+			std::cerr << __func__ << "\t" << i.i;
 		std::cerr << std::endl;
 		//else
 		//	std::cerr << __func__ << "\t" << "pop fail" << std::endl;
@@ -104,6 +122,10 @@ R2()
 
 int main(int argc, char *argv[])
 {
+	std::deque<int> qu;
+	qu.push_back(100);
+	qu.front() = 101;
+	std::cerr << qu.front() << std::endl;
 	auto t1 {std::async(std::launch::async, &W)};
 	auto t2 {std::async(std::launch::async, &R1)};
 	auto t3 {std::async(std::launch::async, &R2)};

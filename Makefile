@@ -78,6 +78,9 @@ unzip: unzip.cpp
 cond_var: cond_var.cpp
 	$(CXX) -std=c++14 -pthread -o$@ $^
 
+att-20kw-test: att-20kw-test.cpp
+	$(CXX) -std=c++14 -pthread -o$@ $^
+
 %: %.c
 	$(COMPILE.c) -o $@ $< $(LIB)
 
