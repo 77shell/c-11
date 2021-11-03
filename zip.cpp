@@ -118,6 +118,7 @@ struct ZIP {
 
 		printf("%s: %s\n", __func__, zip_error_strerror(&err));
 		zip_error_fini(&err);
+		fclose(dupfp);
 		if(zip_close(zip_arch))
 			r = -eZIP_err_close_zipfile;
 		zip_arch = nullptr;
@@ -219,6 +220,7 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 			printf("%s: %s\n", __func__, zip_error_strerror(&err));
 			zip_close(za);
 			zip_error_fini(&err);
+			fclose(dupfp);
 			return -eZIP_err_create_file;
 		}
 		zip_error_fini(&err);
@@ -230,6 +232,7 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 			printf("Add file failed\n");
 			return eZIP_err_add_file;
 		}
+		fclose(dupfp);
 		printf("%s: %s\n", __func__, zip_error_strerror(&err));
 	}
 
