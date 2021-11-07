@@ -26,6 +26,21 @@ enum zip_error_e {
 	eZIP_err_null_archive
 };
 
+namespace {
+	long flen(FILE *fp) {
+		fseek(fp, 0L, SEEK_END);
+		long f_len = ftell(fp);
+		if(f_len == -1L) {
+			perror("Get file size");
+			return -1;
+		}
+		else {
+			printf("File len: %ld\n", f_len);
+		}
+		return f_len;
+	}
+}
+
 struct ZIP {
 	ZIP(const char *path_name)
 		: zip_arch {nullptr}
@@ -76,23 +91,34 @@ struct ZIP {
 		if(!fp)
 			return -eZIP_err_invalid_filep;
 
-		rewind(fp);
+/*
+ * zip_source_filep_create(FILE *file, zip_uint64_t start, zip_int64_t len, zip_error_t *error)
+ *
+ * The file stream is closed when the source is being freed, usually by zip_close(3).
+ */
+		FILE *dupfp {fdopen (dup (fileno (fp)), "r")};
+		flen(dupfp);
+		rewind(dupfp);
 		int r {eZIP_ok};
 		zip_error_t err;
 		zip_error_init(&err);
-		zip_source_t *zs = zip_source_filep_create(fp, 0, 0, &err);
+		zip_source_t *zs = zip_source_filep_create(dupfp, 0, 0, &err);
+
 		if(zs == nullptr) {
 			printf("%s: %s\n", __func__, zip_error_strerror(&err));
 			zip_error_fini(&err);
 			r = -eZIP_err_create_file;
+			fclose(dupfp);
 		}
 		else if(zip_file_add(zip_arch, zfile_name, zs, ZIP_FL_OVERWRITE | ZIP_FL_ENC_GUESS) == -1) {
 			zip_source_free(zs);
 			r = -eZIP_err_add_file;
+			fclose(dupfp);
 		}
 
 		printf("%s: %s\n", __func__, zip_error_strerror(&err));
 		zip_error_fini(&err);
+		fclose(dupfp);
 		if(zip_close(zip_arch))
 			r = -eZIP_err_close_zipfile;
 		zip_arch = nullptr;
@@ -117,6 +143,7 @@ struct ZIP {
 		else {
 			printf("Open archive: %s\n", path_zarch);
 		}
+
 		return 0;
 	}
 
@@ -169,8 +196,10 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 		return eZIP_err_invalid_filep;
 	}
 
+	printf("---------> Open zip archive: %s\n", zip_archive);
+
 	int err;
-	struct zip *za = zip_open(zip_archive, ZIP_CREATE, &err);
+	zip_t *za = zip_open(zip_archive, ZIP_CREATE, &err);
 	if(za == nullptr) {
 		constexpr size_t buflen {64};
 		char errstr[buflen];
@@ -180,15 +209,18 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 	}
 
 	{
-		rewind(filep);
+		FILE *dupfp {fdopen (dup (fileno (filep)), "r")};
+		long f_len = flen(dupfp);
+		rewind(dupfp);
 		zip_error_t err;
 		zip_error_init(&err);
 		printf("zip_source_filep_create()\n");
-		zip_source_t *zs = zip_source_filep_create(filep, 0, 0, &err);
+		zip_source_t *zs = zip_source_filep_create(dupfp, 0, 0, &err);
 		if(zs == nullptr) {
 			printf("%s: %s\n", __func__, zip_error_strerror(&err));
 			zip_close(za);
 			zip_error_fini(&err);
+			fclose(dupfp);
 			return -eZIP_err_create_file;
 		}
 		zip_error_fini(&err);
@@ -200,6 +232,7 @@ zip_filep(const char *zip_archive, FILE *filep, const char *filename)
 			printf("Add file failed\n");
 			return eZIP_err_add_file;
 		}
+		fclose(dupfp);
 		printf("%s: %s\n", __func__, zip_error_strerror(&err));
 	}
 
@@ -278,15 +311,9 @@ zip_gdbm(char *argv[])
 		perror("Create temp file");
 		exit(0);
 	}
-/*
- * zip_source_filep_create(FILE *file, zip_uint64_t start, zip_int64_t len, zip_error_t *error)
- *
- * The file stream is closed when the source is being freed, usually by zip_close(3).
- */
 	//
 	// Due to upon reason, we nned a fp2 to keep initial fd.
 	//
-	FILE *fp2 = fdopen (dup (fileno (fp)), "r");
 	if(dump_dbm(dbm, fp)) {
 		exit(0);
 	}
@@ -295,13 +322,14 @@ zip_gdbm(char *argv[])
 	zip_filep(argv[1], fp, argv[2]);
 	print_filep_len(fp);
 
-	print_filep_len(fp2);
-	zip_filep(argv[1], fp2, "second");
-	print_filep_len(fp2);
+	print_filep_len(fp);
+	zip_filep(argv[1], fp, "second");
+	print_filep_len(fp);
 
 	if(gdbm_close(dbm) != 0) {
 		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
 	}
+	fclose(fp);
 }
 
 
@@ -320,8 +348,6 @@ zip_gdbm2(char *argv[])
 		exit(0);
 	}
 
-	FILE *fp2 = fdopen (dup (fileno (fp)), "r");
-
 	if(dump_dbm(dbm, fp)) {
 		exit(0);
 	}
@@ -338,11 +364,12 @@ zip_gdbm2(char *argv[])
 		// After add_filep(), FILE stream will be close.
 		// So fp2 is necessary.
 		//
-		print_filep_len(fp2);
-		zip.add_filep(fp2, "second");
-		print_filep_len(fp2);
+		print_filep_len(fp);
+		zip.add_filep(fp, "second");
+		print_filep_len(fp);
 	}
 
+	fclose(fp);
 	if(gdbm_close(dbm) != 0) {
 		fprintf(stderr, "%s\n", gdbm_strerror(gdbm_errno));
 	}
@@ -357,7 +384,9 @@ main(int argc, char *argv[])
 	}
 
 	//zip(argv[1], argv[2]);
+
 	zip_gdbm(argv);
 	printf("\n-------------\n");
 	zip_gdbm2(argv);
+	sleep(2);
 }
