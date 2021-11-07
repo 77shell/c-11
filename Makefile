@@ -73,7 +73,10 @@ zip: zip.cpp
 	$(COMPILE.cc) -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -o $@ $< -lzip -lz -lgdbm -ldl
 
 unzip: unzip.cpp
-	$(COMPILE.cc) -o$@ $< -lzip
+	$(COMPILE.cc) -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include  -o$@ $< -lzip -lz -lgdbm -ldl
+
+gdbm_open: gdbm_open.cpp
+	$(COMPILE.cc) -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -o$@ $< -lzip -lz -lgdbm -ldl
 
 cond_var: cond_var.cpp
 	$(CXX) -std=c++14 -pthread -o$@ $^

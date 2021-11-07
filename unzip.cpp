@@ -359,18 +359,18 @@ namespace {
 int main(int argc, char *argv[])
 {
 	const char *prg {argv[0]};
-	if(argc == 2) {
+	if (argc == 2) {
 		unzip(argv[1]);
 	}
-	else if(argc == 3) {
+	else if (argc == 3) {
 		if(unzip_file(argv[1], argv[2]) != 0)
 			fprintf(stderr, "Extract %s failed!\n", argv[2]);
 
 		FILE *fp {_create_temp_file()};
-		if(!fp)
+		if (!fp)
 			return 1;
 
-		if(unzip_filep(argv[1], argv[2], fp) != 0) {
+		if (unzip_filep(argv[1], argv[2], fp) != 0) {
 			fprintf(stderr, "Extract %s to FILE failed!\n", argv[2]);
 		}
 		else {
