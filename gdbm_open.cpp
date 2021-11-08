@@ -5,6 +5,7 @@
 #include <zip.h>
 #include <errno.h>
 #include <memory>
+#include <iostream>
 
 namespace {
 	FILE*
@@ -62,6 +63,8 @@ namespace {
 		dbm_t& operator=(const dbm_t &db) = delete;
 
 		~dbm_t() {
+			std::cerr << __func__ << std::endl;
+
 			if(dbm_file)
 				gdbm_close(dbm_file);
 
@@ -91,7 +94,6 @@ gdbm_import_file(const char *file)
 int
 gdbm_import_filep(dbm_t &dbm, FILE *fp)
 {
-	dbm_t dbm {};
 	unsigned long errline;
 	printf("fp len: %ld\n", flen(fp));
 	rewind(fp);
@@ -210,12 +212,15 @@ main(int argc, char *argv[])
 		printf("%s ziparchive targetfile\n", argv[0]);
 		return 0;
 	}
+
 	FILE *fp {_create_temp_file()};
 	if(unzip_filep(argv[1], argv[2], fp)) {
 		fprintf(stderr, "UNZIP file %s failed!\n", argv[1]);
 		exit(EXIT_FAILURE);
 	}
-	if(gdbm_import_filep(fp)) {
+
+	dbm_t dbm;
+	if(gdbm_import_filep(dbm, fp)) {
 		fprintf(stderr, "GDBM import from fd (%d) failed\n", fileno(fp));
 	}
 
