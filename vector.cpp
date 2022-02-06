@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+#include <atomic>
+
 using namespace std;
 
 struct A;
@@ -34,6 +36,9 @@ int main(int argc, char *argv[])
         {
                 cout << "Map entry: " << i.first << endl;
         }
+
+	vector<atomic<uint16_t>> vec_B(4, static_cast<uint16_t>(0xffff));
+	cout << "vector size() " << vec_B.size() << endl;
                 
 }
 

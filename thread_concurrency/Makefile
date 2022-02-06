@@ -4,6 +4,7 @@ CXXFLAGS := -std=c++14 -pthread
 #BINS := thread_2_1_1 \
 #	ch2_3_spawn_threads
 BINS :=\
+	ch4_packaged_task \
 	ch5_consume \
 	ch5_rel_5_3_3 \
 	ch5_fence_5_3_5 \
