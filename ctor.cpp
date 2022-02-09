@@ -20,7 +20,7 @@ public:
         X& operator=(const X &) = delete;
         
         virtual ~X() {
-                cout << "destructor ~X() " << reinterpret_cast<long>(s) << "\t" << s << endl;
+                cout << "dtor ~X() " << reinterpret_cast<long>(s) << "\t" << s << endl;
                 free(s);
         }
 
@@ -68,21 +68,29 @@ public:
                 }
 };
 
-std::mutex mutex_terminal;
+std::mutex mutex_terminate;
 
 void
-task(std::shared_ptr<X> p)
+task(std::shared_ptr<X> p, string label)
 {
-	std::unique_ptr<X> y {new Y {"Hello"}};
+	std::unique_ptr<X> y {new Y {label.c_str()}};
 	for (;;)
 	{
-		if (mutex_terminal.try_lock()) {
+		if (mutex_terminate.try_lock()) {
 			cout << "Receive signal to terminate task\n";
 			return;
 		}
-		cout << __func__ << " " << p.use_count() << endl;
+		cout << label << "-" << __func__ << " " << p.use_count() << endl;
 		this_thread::sleep_for(1s);
 	}
+}
+
+shared_ptr<X> XX;
+
+shared_ptr<X>
+get_x()
+{
+	return XX;
 }
 
 int main(int argc, char *argv[])
@@ -98,20 +106,48 @@ int main(int argc, char *argv[])
                 MyInt a {1};
                 MyInt b {a};
 
-		int i {1};
-		std::unique_ptr<X> x5 {new X {"UNIQUE_PTR"}};
-		mutex_terminal.lock();
-		thread t {&task, std::shared_ptr<X>(x5.get())};
-		pthread_t pid {t.native_handle()};
+		{
+			int i {1};
+			// std::unique_ptr<X> x5 {new X {"UNIQUE_PTR"}};
+			XX.reset(new X {"SHARED_PTR"});
+			mutex_terminate.lock();
+			// thread t1 {&task, std::shared_ptr<X>(x5.get()), string {"t1"}};
+			thread t2 {&task, std::shared_ptr<X>(get_x()), string {"t2"}};
+			thread t3 {&task, std::shared_ptr<X>(get_x()), string {"t3"}};
+			// pthread_t pid {t1.native_handle()};
 
-		for (;;) {
-			i++;
-			this_thread::sleep_for(1s);
-			if (i == 4) {
-				mutex_terminal.unlock();
-				t.join();
+			for (shared_ptr<X> x = get_x(); i < 9; i++) {
+				this_thread::sleep_for(1s);
+				cout << __func__ << " use count " << x.use_count() << endl;
+				if (i == 2) {
+					mutex_terminate.unlock();
+				}
+				if (i == 3) {
+					mutex_terminate.unlock();
+				}
+				// if (i == 4) {
+				// 	mutex_terminate.unlock();
+				// }
+				// cout << __func__ << " " << i << endl;
 			}
-			cout << __func__ << " " << i << endl;
+
+			// if (t1.joinable())
+			// 	t1.join();
+
+			if (t2.joinable())
+				t2.join();
+
+			if (t3.joinable())
+				t3.join();
+
+			cout << __func__ << " use count " << XX.use_count() << endl;
+			XX.reset();
+		}
+
+		for (;;)
+		{
+			cout << "Use count " << get_x().use_count() << endl;
+			this_thread::sleep_for(1s);
 		}
         }
         catch(...) {
