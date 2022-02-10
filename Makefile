@@ -87,8 +87,12 @@ cond_var: cond_var.cpp
 att-20kw-test: att-20kw-test.cpp
 	$(CXX) -std=c++14 -pthread -o$@ $^
 
+
 sem: CXXFLAGS += -pthread
 ctor: CXXFLAGS += -pthread
+shared_ptr2: CXXFLAGS += -pthread
+mutex: CXXFLAGS += -pthread
+forward_list: CXXFLAGS += -pthread
 
 %: %.c
 	$(COMPILE.c) -o $@ $< $(LIB)

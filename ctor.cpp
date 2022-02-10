@@ -16,22 +16,22 @@ public:
                         cout << "X(const char *str) constructor " << s << endl;
                 }
 
-        X(const X&) = delete;
-        X& operator=(const X &) = delete;
+        //X(const X&) = delete;
+        //X& operator=(const X &) = delete;
         
         virtual ~X() {
                 cout << "dtor ~X() " << reinterpret_cast<long>(s) << "\t" << s << endl;
                 free(s);
         }
 
-#if 0
+
         X(const X &x)
                 {
                         if(x.s)
                                 s = strdup(x.s);
                         cout << "copy constructor : X(const X &)" << endl;
                 }
-
+#if 1
         X& operator=(const X &x) {
                 strcpy(s, x.s);
                 cout << "copy assignment=(const X&)" << endl;
@@ -55,11 +55,11 @@ public:
 
 class MyInt {
         int m;
+ public:
+         MyInt(int i)
+                 : m {i}
+                 {}
 
-public:
-        MyInt(int i)
-                : m {i}
-                {}
 
         MyInt(MyInt &i)
                 {
@@ -101,7 +101,13 @@ int main(int argc, char *argv[])
                 //x2 = x3;
 
                 X x4 {"youdontknow"};
-                //x4 = x1;
+                // x4 = x1;
+
+		X x5 = x1; // invoke copy ctor
+		X x6 {x4}; // invoke copy ctor
+
+		cout << "hello ------------------- \n";
+
 
                 MyInt a {1};
                 MyInt b {a};

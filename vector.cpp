@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <atomic>
+#include <memory>
 
 using namespace std;
 
@@ -16,16 +17,18 @@ struct A {
                         A_map.insert({id, this});
                 }
 
-        ~A()
-                {
-                        //A_map.erase(i);
-                }
+	~A() {
+		std::cout << __func__ << std::endl;
+	}
 
         std::string s;
         int i;
 };
 
 std::vector<A> vec_A;
+
+constexpr size_t ptr_size {5};
+std::vector<std::unique_ptr<A>> vec_ptr(ptr_size);
 
 int main(int argc, char *argv[])
 {
@@ -37,9 +40,37 @@ int main(int argc, char *argv[])
                 cout << "Map entry: " << i.first << endl;
         }
 
+
 	vector<atomic<uint16_t>> vec_B(4, static_cast<uint16_t>(0xffff));
 	cout << "vector size() " << vec_B.size() << endl;
-                
+	// Vector element: unique_ptr
+	vec_ptr.at(0) = std::make_unique<A>("first", 0);
+	cout << vec_ptr.at(0)->s << vec_ptr.at(0)->i << std::endl;
+	try {
+		vec_ptr.at(5) = std::make_unique<A>("ohno....", 3);
+	}
+	catch (const std::out_of_range &e) {
+		std::cout << e.what() << std::endl;
+	}
+
+	if (!vec_ptr.at(1).get()) {
+		std::cout << "Element-1 has not init yet\n";
+		vec_ptr.at(1) = std::make_unique<A>("second", 1);
+		A *a = vec_ptr.at(1).get();
+	}
+
+	std::vector<std::unique_ptr<A>>::iterator it {vec_ptr.begin()};
+	cout << "Element-0 : " << (**it).s << endl;
+	++it;
+	cout << "Element-1 : " << (**it).s << endl;
+
+	for (auto i = vec_ptr.begin(); i != vec_ptr.end(); i++)
+		if (it->get()) {
+			cout << "Element : " << (**it).s << endl;
+		}
+		else {
+			cout << "Element has not initialzed yet\n";
+		}
 }
 
 static void test_1()

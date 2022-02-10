@@ -514,7 +514,7 @@ int main(int argc, char **argv)
 	/*----------------------------------------------------
 	 * OpenSSL 3.0
 	 */
-	printf("OpenSSL 3.0\n");
+	printf("\n----\nOpenSSL 3.0\n");
 	util::SHA256 sha256 {argv[1]};
 	printf("Digest len: %d\n", sha256.digest_len());
 	printf("%s\n", sha256.digest().c_str());
@@ -541,7 +541,7 @@ int main(int argc, char **argv)
 	/*----------------------------------------------------
 	 * Test copy test
 	 */
-	util::SHA256 sha256_2 = sha256;
+	// util::SHA256 sha256_2 = sha256;
 	return 0;
 }
 
