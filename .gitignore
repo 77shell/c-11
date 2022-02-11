@@ -16,7 +16,6 @@ exception
 exception_13_5_2
 exception_type
 forward_list
-forward_list.cpp
 fsm/
 gdbm_load.c
 hello
