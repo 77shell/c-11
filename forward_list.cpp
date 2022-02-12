@@ -35,15 +35,14 @@ template <class T>
 struct ptr_list {
 
 	struct ptr_deleter {
-		void operator()(T *dev) const {
-			std::cout << "Call delete from function object. dev->" << static_cast<int>(dev->modaddr) << '\n';
+		void operator()(T *_p) const {
+			std::cout << "Call delete from function object " << _p << endl;
 		}
 	};
 
-	template <class U>
-	struct ptr : public std::shared_ptr<U> {
-		ptr(U *src, ptr_deleter d, ptr_list *p)
-			: std::shared_ptr<U> {src, d}, ptrlist {p}
+	struct ptr : public std::shared_ptr<T> {
+		ptr(T *src, ptr_deleter d, ptr_list *p)
+			: std::shared_ptr<T> {src, d}, ptrlist {p}
 			{}
 
 		ptr(ptr_list *p)
@@ -53,30 +52,45 @@ struct ptr_list {
 			}
 
 		~ptr() {
-			cout << __func__ << ptrlist << endl;
-			// std::lock_guard<std::mutex> lck {ptrlist->list_lock};
-			ptrlist->cv.notify_one();
+			cout << __func__ << endl;
+			if (ptrlist) {
+				cout << "### " << __func__ << ": p use count " << std::shared_ptr<T>::use_count() << endl;
+				if (std::shared_ptr<T>::use_count())
+					ptrlist->cv.notify_one();
+			}
+		}
+
+		void reset() {
+			cout << __func__ << endl;
+			std::shared_ptr<T>::reset();
+			if (ptrlist)
+				ptrlist->cv.notify_one();
 		}
 
 		ptr_list *ptrlist;
 	};
 
-	void push(T *dev) {
+	void push(T *_p) {
 		std::lock_guard<std::mutex> lck {list_lock};
-		for (auto p : list)
-			if (p.get() == dev)
-				return;
+		if (!list.empty()) {
+			for (auto &p : list)
+				if (p.get() == _p)
+					return;
+		}
 
-		list.push_front(ptr<T>(dev, ptr_deleter {}, this));
+		list.push_front(ptr {_p, ptr_deleter {}, this});
 		listchanged_flag.clear();
 	}
 
-	void remove(T *dev) {
+	void remove(T *_p) {
 		std::unique_lock<std::mutex> lck {list_lock};
-		cout << __func__ << endl;
+		if (list.empty())
+			return;
+
+		cout << __func__ << ": start ---------------------\n";
 		list.remove_if(
-			[&](ptr<T> &p) {
-				if (p.get() == dev) {
+			[&](ptr &p) {
+				if (p.get() == _p) {
 					cv.wait(lck, [&]() {
 							     cout << "*** " << __func__ << ": p use count " << p.use_count() << endl;
 							     return p.use_count() <= 1;
@@ -88,7 +102,33 @@ struct ptr_list {
 			}
 			);
 		listchanged_flag.clear();
-		cout << __func__ << ": end\n";
+		cout << __func__ << ": end ---------------------- \n";
+	}
+
+	void remove(ptr &&_p) {
+		std::unique_lock<std::mutex> lck {list_lock};
+		cout << __func__ << ": start ---------------------\n";
+		cout << __func__ << " use count: " << _p.use_count() << endl;
+		if (list.empty())
+			return;
+
+		cout << __func__ << endl;
+		list.remove_if(
+			[&](ptr &p) {
+				if (p.get() == _p.get()) {
+					cv.wait(lck, [&]() {
+							     cout << "$$$ " << __func__ << ": p use count " << p.use_count() << endl;
+							     return p.use_count() <= 1;
+						     }
+						);
+					_p.ptrlist = nullptr;
+					return true;
+				}
+				return false;
+			}
+			);
+		listchanged_flag.clear();
+		cout << __func__ << ": end ---------------------- \n";
 	}
 
 	void pop_front() {
@@ -112,54 +152,62 @@ struct ptr_list {
 		return !listchanged_flag.test_and_set();
 	}
 
+	size_t count() {
+		std::lock_guard<std::mutex> lck {list_lock};
+		return std::distance(list.begin(), list.end());
+	}
+
 	struct iterator {
 		iterator(ptr_list &v)
-			: dev {v}
+			: _ptrlist {v}
 			{
-				std::lock_guard<std::mutex> lck {dev.list_lock};
-				list_iterator = dev.list.begin();
+				std::lock_guard<std::mutex> lck {_ptrlist.list_lock};
+				list_iterator = _ptrlist.list.begin();
 			}
 
-		bool operator!=(const typename std::forward_list<ptr<T>>::iterator &rhs) {
-			std::lock_guard<std::mutex> lck {dev.list_lock};
+		bool operator!=(const typename std::forward_list<ptr>::iterator &rhs) {
+			std::lock_guard<std::mutex> lck {_ptrlist.list_lock};
 			return list_iterator != rhs;
 		}
 
-		bool operator==(const typename std::forward_list<ptr<T>>::iterator &rhs) {
-			std::lock_guard<std::mutex> lck {dev.list_lock};
+		bool operator==(const typename std::forward_list<ptr>::iterator &rhs) {
+			std::lock_guard<std::mutex> lck {_ptrlist.list_lock};
 			return list_iterator == rhs;
 		}
 
-		ptr<T> operator*() {
-			std::lock_guard<std::mutex> lck {dev.list_lock};
-			// if (dev.list_changed())
-			// 	list_iterator = dev.list.begin();
+		ptr operator*() {
+			std::lock_guard<std::mutex> lck {_ptrlist.list_lock};
 			return *list_iterator;
 		}
 
-		ptr<T> operator++(int) { // Post-increment, iterator++
-			std::lock_guard<std::mutex> lck {dev.list_lock};
-			// if (dev.list_changed()) {
-			// 	list_iterator = dev.list.begin();
-			// 	return *list_iterator;
-			// }
-
-			return list_iterator == dev.list.end()
-				? nullptr
-				: *list_iterator++;
+		ptr operator++(int) { // Post-increment, iterator++
+			std::lock_guard<std::mutex> lck {_ptrlist.list_lock};
+			// return list_iterator == _ptrlist.list.end()
+			// 	? nullptr
+			// 	: *list_iterator++;
+			if (list_iterator == _ptrlist.list.end())
+			{
+				cout << __func__ << " list_iterator reach to the end\n";
+				return nullptr;
+			}
+			else
+			{
+				cout << __func__ << " list_iterator doesn't reach to the end\n";
+				return *list_iterator++;
+			}
 		}
 
 	private:
-		ptr_list &dev;
-		typename std::forward_list<ptr<T>>::iterator list_iterator;
+		ptr_list &_ptrlist;
+		typename std::forward_list<ptr>::iterator list_iterator;
 	};
 
-	typename std::forward_list<ptr<T>>::iterator begin() {
+	typename std::forward_list<ptr>::iterator begin() {
 		std::lock_guard<std::mutex> lck {list_lock};
 		return list.begin();
 	}
 
-	typename std::forward_list<ptr<T>>::iterator end() {
+	typename std::forward_list<ptr>::iterator end() {
 		std::lock_guard<std::mutex> lck {list_lock};
 		return list.end();
 	}
@@ -167,14 +215,15 @@ struct ptr_list {
 	std::atomic_flag listchanged_flag;
 	std::mutex list_lock;
 	std::condition_variable cv;
-	std::forward_list<ptr<T>> list;
+	std::forward_list<ptr> list;
 };
 
 ptr_list<IMBUSdev> mDevList;
 
 std::forward_list<int> X;
 std::mutex mutex_terminate;
-std::mutex mutex_signal;
+std::mutex mutex_signal_a;
+std::mutex mutex_signal_b;
 
 void
 do_work(promise<void> p)
@@ -187,85 +236,15 @@ do_work(promise<void> p)
 	p.set_value();
 }
 
-void
-read_list()
-{
-	for (;;)
-	{
-		cout << "R: ";
-		for (ptr_list<IMBUSdev>::iterator it = mDevList; it != mDevList.end(); it++) {
-			cout << "Current ptr use count " << (*it).use_count() << endl;
-			cout << static_cast<int>((**it).modaddr) << " ";
-		}
-		cout << endl;
-		this_thread::sleep_for(200ms);
-	}
-}
+IMBUSdev d1 {1};
+IMBUSdev d2 {2};
+IMBUSdev d3 {3};
+IMBUSdev d4 {4};
+void watch_add();
+void remove_dev();
 
-void
-append_dev_to_list()
-{
-	uint8_t i {1};
-
-	for (;;)
-	{
-		if (mutex_terminate.try_lock()) {
-			cout << "Receive signal to terminate " << __func__ << endl;;
-			mDevList.clear();
-			return;
-		}
-
-		mDevList.push(new IMBUSdev {i++});
-		cout << "Append:" << static_cast<int>(i) << endl;
-		this_thread::sleep_for(1s);
-	}
-}
-
-void
-remove_dev_from_list()
-{
-	for (;;)
-	{
-		// mDevList.remove(reinterpret_cast<void*>(i++));
-		// cout << "Remove:" << i << endl;
-		cout << "Pop front\n";
-		mDevList.pop_front();
-		this_thread::sleep_for(800ms);
-	}
-}
-
-void
-read_use_count()
-{
-	for (;!mutex_signal.try_lock(); this_thread::sleep_for(1s));
-	ptr_list<IMBUSdev>::iterator it {mDevList};
-
-	int i {0};
-	for (ptr_list<IMBUSdev>::ptr<IMBUSdev> r = *it;; this_thread::sleep_for(1s)) {
-		cout << __func__ << ": current ptr use count " << r.use_count() << "=" << (*it).use_count() << endl;
-		if (i++ == 6)
-			break;
-	}
-
-	cout << __func__ << ": exit!\n";
-	mutex_signal.unlock();
-}
-
-void
-send_signal()
-{
-	while (mDevList.list.empty())
-		this_thread::sleep_for(1s);
-
-	for (;;this_thread::sleep_for(1s))
-	{
-		std::lock_guard<std::mutex> lck {mutex_signal};
-		cout << __func__ << " notify_one\n";
-		mDevList.cv.notify_one();
-	}
-}
-
-int main()
+int
+main()
 {
 	std::forward_list<int> l = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
  
@@ -310,37 +289,81 @@ int main()
 	cout << *it << endl;
 	it++;
 	cout << *it << endl;
+	if (t.joinable())
+		t.join();
 
+// Test add
 // -----------------------------------------
-	mutex_signal.lock();
-	IMBUSdev d1 {1};
-	// IMBUSdev d2 {2};
+	mutex_signal_a.lock();
+	mutex_signal_b.lock();
+
 	mDevList.push(&d1);
-	// mDevList.push(&d2);
+	thread task {watch_add};
+	cout << __func__ << " locking signal-a\n";
+	mutex_signal_a.lock(); // wait task watch_add
+	cout << __func__ << " signal-a unlocked()\n";
+	mDevList.push(&d2);
+	mDevList.push(&d3);
+	mDevList.push(&d4);
+	cout << __func__ << "List cout: " << mDevList.count() << endl;
+	cout << __func__ << " unlocking signal-b\n";
+	mutex_signal_b.unlock();
 
-	// thread R {read_list};
-	// thread A {append_dev_to_list};
-	// thread D {remove_dev_from_list};
-	thread B {read_use_count};
-	// thread X {send_signal};
+	if (task.joinable())
+		task.join();
 
-	for (int i = 0; i < 100; i++) {
-		if (i == 2)
-			mutex_signal.unlock();
-
-		if (mDevList.list.empty())
-			cout << __func__ << ": no device in list\n";
-		else
-			cout << __func__ << ": dev ptr list first element-" << mDevList.list.front().use_count() << endl;
-
-		this_thread::sleep_for(900ms);
-
-		if (i > 3 && !mDevList.list.empty()) {
-			// mDevList.pop_front();
-			mutex_signal.unlock();
-			mDevList.remove(&d1);
-			// if (X.joinable())
-			//	X.join();
-		}
+// Test remove
+// -----------------------------------------
+	cout << "\n\n-----------Test remove() ---------------\n";
+	{
+		ptr_list<IMBUSdev>::ptr ptr_begin {*mDevList.begin()};
+		auto p = std::async(std::launch::async, remove_dev);
+		for (int i = 0; i < 5; i++, this_thread::sleep_for(1s))
+			cout << ".\n";
+		ptr_begin.reset();
 	}
+
+	if (task.joinable())
+		task.join();
+
+	for(;;)
+	{
+		cout << "hello\n";
+		this_thread::sleep_for(2s);
+		break;
+	}
+}
+
+void
+watch_add()
+{
+	ptr_list<IMBUSdev>::iterator it {mDevList};
+	cout << __func__ << ": modaddr " << static_cast<int>((*it)->modaddr) << endl;
+	it++;
+	cout << __func__ << " unlocking signal-a\n";
+	mutex_signal_a.unlock();
+	mutex_signal_b.lock();
+	cout << __func__ << " signal-b unlocked\n";
+
+	if (it == mDevList.end()) {
+		cout << __func__ << " reach to end of list\n";
+	}
+	else {
+		cout << __func__ << " iterator changed , (*it)->modaddr " << static_cast<int>((*it)->modaddr) << endl;
+	}
+	
+}
+
+void
+remove_dev()
+{
+	std::forward_list<ptr_list<IMBUSdev>::ptr>::iterator it {mDevList.begin()};
+	cout << __func__ << ": modaddr " << static_cast<int>((*it)->modaddr) << endl;
+	mDevList.remove(std::move(*it));
+	it = mDevList.begin();
+	for (int i = 0; i < 3; i++) {
+		this_thread::sleep_for(1s);
+		cout << __func__ << ": modaddr " << static_cast<int>((*it++)->modaddr) << endl;
+	}
+
 }
