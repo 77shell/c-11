@@ -360,6 +360,10 @@ remove_dev()
 	std::forward_list<ptr_list<IMBUSdev>::ptr>::iterator it {mDevList.begin()};
 	cout << __func__ << ": modaddr " << static_cast<int>((*it)->modaddr) << endl;
 	mDevList.remove(std::move(*it));
+
+	// *******
+	// After remove() call, iterator become an invalided iterator
+	//
 	it = mDevList.begin();
 	for (int i = 0; i < 3; i++) {
 		this_thread::sleep_for(1s);
