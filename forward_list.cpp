@@ -5,16 +5,11 @@
 #include <thread>
 #include <future>
 #include <condition_variable>
+#include <algorithm>
 
 using namespace std;
 
 struct IMBUSdev {
-	IMBUSdev(uint8_t ad) : _state {eDisconnected}, modaddr {ad}
-		{}
-
-	~IMBUSdev()
-		{}
-
 	enum State_e {
 		eError,
 		eDisconnected,
@@ -24,6 +19,15 @@ struct IMBUSdev {
 		eOperational,
 		eSWdownloading
 	} _state;
+
+	IMBUSdev(uint8_t ad) : _state {eDisconnected}, modaddr {ad}
+		{}
+
+	IMBUSdev(uint8_t ad, State_e s) : _state {s}, modaddr {ad}
+		{}
+
+	~IMBUSdev()
+		{}
 
 	State_e state() const {
 		return _state;
@@ -157,6 +161,11 @@ struct ptr_list {
 		return std::distance(list.begin(), list.end());
 	}
 
+	size_t count_if(std::function<bool(ptr &_p)> pred) {
+		std::lock_guard<std::mutex> lck {list_lock};
+		return std::count_if(list.begin(), list.end(), pred);
+	}
+
 	struct iterator {
 		iterator(ptr_list &v)
 			: _ptrlist {v}
@@ -237,9 +246,9 @@ do_work(promise<void> p)
 }
 
 IMBUSdev d1 {1};
-IMBUSdev d2 {2};
-IMBUSdev d3 {3};
-IMBUSdev d4 {4};
+IMBUSdev d2 {2, IMBUSdev::eOperational};
+IMBUSdev d3 {3, IMBUSdev::ePreparing};
+IMBUSdev d4 {4, IMBUSdev::ePrepared};
 void watch_add();
 void remove_dev();
 
@@ -330,7 +339,24 @@ main()
 	{
 		cout << "hello\n";
 		this_thread::sleep_for(2s);
-		break;
+		cout << "IMBUSdev::eOperation count: " << mDevList.count_if([](ptr_list<IMBUSdev>::ptr &_p) { return _p->state() == IMBUSdev::eOperational; }) << endl;
+		cout << "IMBUSdev::eDisconnected count: " << mDevList.count_if([](ptr_list<IMBUSdev>::ptr &_p) { return _p->state() == IMBUSdev::eDisconnected; }) << endl;
+		cout << "IMBUSdev::ePrepared count: " << mDevList.count_if([](ptr_list<IMBUSdev>::ptr &_p) { return _p->state() == IMBUSdev::ePrepared; }) << endl;
+		cout << "IMBUSdev::ePreparing count: " << mDevList.count_if([](ptr_list<IMBUSdev>::ptr &_p) { return _p->state() == IMBUSdev::ePreparing; }) << endl;
+		cout << "IMBUSdev eOperational | eDisconnected | ePreparing | ePrepared count: "
+		     << mDevList.count_if([](ptr_list<IMBUSdev>::ptr &_p) {
+						  IMBUSdev::State_e s {_p->state()};
+						  switch (s) {
+						  case IMBUSdev::eDisconnected:
+						  case IMBUSdev::eOperational:
+						  case IMBUSdev::ePrepared:
+						  case IMBUSdev::ePreparing:
+							  return true;
+						  default:
+							  return false;
+						  }
+					  })
+		     << endl;
 	}
 }
 
@@ -369,5 +395,4 @@ remove_dev()
 		this_thread::sleep_for(1s);
 		cout << __func__ << ": modaddr " << static_cast<int>((*it++)->modaddr) << endl;
 	}
-
 }
