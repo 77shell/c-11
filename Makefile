@@ -25,7 +25,7 @@ endif
 include ./Makefile.inc
 
 
-INCLUDEPATH += -iquote$(SRC_ROOT)/include
+INCLUDEPATH += -iquote$(SRC_ROOT)/include -iquote"/home/max/src/csu.linux/include" -I"/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include"
 LIBSPATH = -Wl,-rpath,/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
 
