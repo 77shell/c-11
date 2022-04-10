@@ -2,6 +2,8 @@
 #include <unordered_map>
 #include <typeindex>
 #include <map>
+#include <vector>
+#include "db/datum.h"
 
 struct A {
         A(int j)
@@ -64,8 +66,14 @@ std::map<std::type_index, B*> typeid_map {
 int
 main(int argc, char *argv[])
 {
+	using namespace std;
         std::cout << typeid(A::map[1]).name() << std::endl;
 	B *pB {&b1};
 	std::cout << typeid_map[pB->type_id()]->name() << std::endl;
+
+	std::vector<std::type_index> vec_t { typeid(int), typeid(short), typeid(Database::DATUM<u32>) };
+	for (auto &t : vec_t) {
+		cout << "Name: " << t.name() << "\thash code: " << hex << t.hash_code() << endl;
+	}
         return 0;
 }
