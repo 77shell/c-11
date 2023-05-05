@@ -237,5 +237,9 @@ int main(int argc, char *argv[])
 		// UTC:   Fri Dec 13 20:45:52 1901 GMT
 		usec = 0x80000000;
 		std::cout << "UTC:   " << std::put_time(std::gmtime(&usec), "%c %Z") << '\n';
+
+		// UTC:   Fri Dec 13 20:45:53 1901 GMT
+		usec = 0x80000001;
+		std::cout << "UTC:   " << std::put_time(std::gmtime(&usec), "%c %Z") << '\n';
 	}
 }
