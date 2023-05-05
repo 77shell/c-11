@@ -220,6 +220,7 @@ int main(int argc, char *argv[])
 		if (!tm) {
 			std::cerr << __func__ << " cannot convert utc_sec " << usec << '\n';
 		}
+		// UTC:   Tue Jan 19 03:14:07 2038 GMT
 		std::cout << "UTC:   " << std::put_time(std::gmtime(&usec), "%c %Z") << '\n'; // 7fff'ffffh
 
 		// UTC:   Thu Jan  1 00:00:00 1970 GMT
