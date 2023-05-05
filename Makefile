@@ -64,10 +64,10 @@ deque: deque.cpp
 	$(COMPILE.cc) -o $@ $< -pthread
 
 sha256: sha256.cpp
-	$(COMPILE.cc) -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include  -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64 -o$@ $< -lcrypto -lssl -lgdbm -ldl
+	$(COMPILE.cc) -I/home/max/src-local/csu.linux/x86/gcc-9.3.0-17/usr/local/include -L/home/max/src-local/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -L/home/max/src-local/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64 -o$@ $< -lcrypto -lssl -lgdbm -ldl
 
 zip: zip.cpp
-	$(COMPILE.cc) -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include -o $@ $< -lzip -lz -lgdbm -ldl
+	$(COMPILE.cc) -L/home/max/src-local/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src-local/csu.linux/x86/gcc-9.3.0-17/usr/local/include -o $@ $< -lzip -lz -lgdbm -ldl
 
 unzip: unzip.cpp
 	$(COMPILE.cc) -L/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib -I/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include  -o$@ $< -lzip -lz -lgdbm -ldl
@@ -84,6 +84,8 @@ cond_var: cond_var.cpp
 att-20kw-test: att-20kw-test.cpp
 	$(CXX) -std=c++14 -pthread -o$@ $^
 
+stack-overflow: stack-overflow.cpp
+	$(CXX) -fstack-protector-strong -fsanitize=address -o$@ $^
 
 sem: CXXFLAGS += -pthread
 ctor: CXXFLAGS += -pthread

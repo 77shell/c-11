@@ -69,3 +69,21 @@ main()
 	sleep(1);
 	exit(0);
 }
+
+
+void
+consume_str(string s)
+{
+	string tmp {std::move(s)};
+	cout << __func__ << s << endl;
+	cout << __func__ << tmp << endl;
+}
+
+int
+_main()
+{
+	string s1 {"hello"};
+	consume_str(s1);
+	cout << __func__ << s1 << endl;
+	return 0;
+}

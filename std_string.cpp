@@ -4,6 +4,8 @@
 int
 main(int argc, char *argv[])
 {
+	char *p {nullptr};
+	std::string s0 {p};
 	std::string s {' '};
 	//s.assign(30, ' ');
 	s[0] = 'A';
