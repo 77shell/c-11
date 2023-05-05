@@ -2,44 +2,41 @@
 #include <stdio.h>
 
 int
+src_is_shorter_than_dest()
+{
+        constexpr size_t dest_len {32};
+        const char *src {"12345678"};
+        char dest[dest_len]; /* null character */
+
+	for (int i {}; i < dest_len; i++)
+		dest[i] = 'X';
+
+	size_t len {12};
+	strncpy(dest, src, len);
+	printf("Copy string len %zd\n", len);
+	for (int i {}; i < dest_len; i++)
+		printf("%02Xh-%c ", dest[i], dest[i]);
+
+        return 0;
+}
+
+int
 main(int argc, char *argv[])
 {
-        static const size_t dest_len {16};
-        const char *src {"0123456789ABCEDF"};
-        char dest[dest_len + 1]; /* null character */
-        const size_t src_len = strlen(src);
+        constexpr size_t dest_len {32};
+        const char *src {"123456789ABCEDF"};
+        char dest[dest_len]; /* null character */
 
-        for(int i=0; i<dest_len; i++)
-                dest[i] = 'X';
-        
-        for(int i=0; i<dest_len; i++)
-                fprintf(stderr, "%c - %02X\n", dest[i], dest[i]);
-        fprintf(stderr, "\n");
+	for (int i {}; i < dest_len; i++)
+		dest[i] = 'X';
 
-        fprintf(stderr, "src : %s\n", src);
-        fprintf(stderr, "dest: %s\n", dest);
-        
-        if(src_len == dest_len) {
-                fprintf(stderr,  "src(%ld) == dest(%ld)\n", src_len, dest_len);
-                strcpy(dest, src);       
-        }
-        else {
-                if(src_len > dest_len) {
-                        fprintf(stderr, "src(%ld) > dest(%ld)\n", src_len, dest_len);
-                        strncpy(dest, src, src_len);
-                        dest[dest_len] = '\0';
-                }
-                else {
-                        fprintf(stderr, "src(%ld) < dest(%ld)\n", src_len, dest_len);
-                        strcpy(dest, src);
-                }
-        }
-        
-        fprintf(stderr, "\n");
-        fprintf(stderr, "src : %s\n", src);
-        fprintf(stderr, "dest: %s\n", dest);
-        
-        for(int i=0; i<dest_len; i++)
-                fprintf(stderr, "%c - %02X\n", dest[i], dest[i]);
+	size_t len {10};
+	strncpy(dest, src, len);
+	printf("Copy string len %zd\n", len);
+	for (int i {}; i < dest_len; i++)
+		printf("%02Xh-%c ", dest[i], dest[i]);
+
+	puts("\nTest case 2: src is shorter than dest");
+	src_is_shorter_than_dest();
         return 0;
 }

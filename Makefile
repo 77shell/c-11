@@ -5,8 +5,6 @@
 # 2011-Aug-22
 # Max <max.yang@delta.com.tw>
 #
-# To build *csu*
-# 
 
 DBG=y
 
@@ -21,9 +19,7 @@ OPTIMIZE=-O0
 PROFILE=-pg
 endif
 
-
 include ./Makefile.inc
-
 
 INCLUDEPATH += -iquote$(SRC_ROOT)/include -iquote"/home/max/src/csu.linux/include" -I"/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/include"
 LIBSPATH = -Wl,-rpath,/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
@@ -47,7 +43,8 @@ BINS := hello \
 	exception_13_5_2 \
 	cond_var \
 	catch_signals \
-	unordered_map
+	unordered_map \
+	shced
 
 .PHONY: impl_pattern
 impl_pattern: impl_pattern.cpp impl_pattern_test.cpp
@@ -93,6 +90,8 @@ ctor: CXXFLAGS += -pthread
 shared_ptr2: CXXFLAGS += -pthread
 mutex: CXXFLAGS += -pthread
 forward_list: CXXFLAGS += -pthread
+datum_cstr: CXXFLAGS += -fstack-protector-all -fsanitize=address
+sched: CXXFLAGS = -pthread
 
 %: %.c
 	$(COMPILE.c) -o $@ $< $(LIB)

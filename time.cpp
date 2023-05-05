@@ -22,5 +22,6 @@ main(int argc, char *argv[])
 	std::chrono::milliseconds p {50ms};
 	std::chrono::milliseconds ms;
 
-	std::cout << "Count: " << ms.count() << "count: " << s.count() / p.count() << std::endl;;
+	std::cout << "Count: " << ms.count() << "count: " << s.count() / p.count() << std::endl;
+	std::cout << "sizeof(time_t) " << sizeof(std::time_t) << std::endl;
 }

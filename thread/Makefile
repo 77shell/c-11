@@ -1,2 +1,2 @@
-CXXFLAGS = -pthread
+CXXFLAGS = -pthread -ggdb
 
