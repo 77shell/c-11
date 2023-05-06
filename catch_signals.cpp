@@ -24,7 +24,6 @@ void h()
         string s2 = "at all";
 }
 
-
 int main(int argc, char *argv[])
 {
         int signals[] = {SIGTERM, SIGQUIT, SIGABRT, SIGINT, SIGKILL};
@@ -38,8 +37,8 @@ int main(int argc, char *argv[])
 
         for(int i=0;;i++, sleep(1))
         {
-                if(i == 100)
-                        h();
+                if(i == 3)
+                        abort();
         }
         return 0;
 }

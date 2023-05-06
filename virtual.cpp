@@ -1,31 +1,41 @@
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 using namespace std;
+using namespace std::chrono_literals;
 
 class A {
 public:
-	virtual void a() = 0;
+	A() {
+		ctor_task();
+	}
+
+	virtual void a()
+		{ cout << "A " << __func__ << endl; }
+
+	virtual void ctor_task()
+		{ cout << "A " << __func__ << endl; }
 };
 
 
 class B : public A {
 public:
-	static B& getInstance() {
-		static B b;
-		return b;
-	}
+	virtual void a()
+		{ std::cout << "B " << __func__ << std::endl; }
+
+	virtual void ctor_task()
+		{ cout << "B " << __func__ << endl; }
 	
-	virtual void a() {
-		std::cout << __func__ << std::endl;
+	B() {
+		ctor_task();
 	}
-	
-private:
-	B() {}
 };
 
 class C : public A {
 public:
-	virtual void a() { cout << "C " << __func__ << endl; }
+	virtual void a()
+		{ cout << "C " << __func__ << endl; }
 };
 
 struct S {
@@ -41,9 +51,7 @@ int
 main(int argc, char *argv[])
 {
 	std::cout << "Hello" << std::endl;
-	// B::getInstance().a();
-	C *c = new C;
-	S s {c};
-	s.pA->a();
+	B *b {new B {}};
+	std::this_thread::sleep_for(2s);
 	return 0;
 }

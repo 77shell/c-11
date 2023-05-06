@@ -15,7 +15,7 @@ OPTIMIZE=-O2
 PROFILE=
 else
 DEBUG=-g
-OPTIMIZE=-O0
+OPTIMIZE=-O0 -DNDEBUG
 PROFILE=-pg
 endif
 
@@ -87,6 +87,9 @@ att-20kw-test: att-20kw-test.cpp
 stack-overflow: stack-overflow.cpp
 	$(CXX) -fstack-protector-strong -fsanitize=address -o$@ $^
 
+test_ptr: test_ptr.cpp
+	$(CXX) -pthread -o$@ $^
+
 sem: CXXFLAGS += -pthread
 ctor: CXXFLAGS += -pthread
 shared_ptr2: CXXFLAGS += -pthread
@@ -107,7 +110,7 @@ clean:
 	find . -regextype posix-egrep -iregex '.*\.#.*' | xargs rm
 	find . -iregex .*~$ | xargs rm
 	rm $(BINS) *.o *~ -rf
-
+	find . -type f -exec sh -c "file {} | grep -i elf > /dev/null && rm {}" \;
 
 .PHONY: TAGS
 TAGS:

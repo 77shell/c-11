@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <atomic>
 #include <memory>
+#include <initializer_list>
 
 using namespace std;
 
@@ -29,9 +30,12 @@ std::vector<A> vec_A;
 
 constexpr size_t ptr_size {5};
 std::vector<std::unique_ptr<A>> vec_ptr(ptr_size);
+static void test_2();
 
 int main(int argc, char *argv[])
 {
+	test_2();
+
         vec_A.push_back(A {"hello", 1});
         
         cout << "Map size: " << A_map.size() << endl;
@@ -41,7 +45,7 @@ int main(int argc, char *argv[])
         }
 
 
-	vector<atomic<uint16_t>> vec_B(4, static_cast<uint16_t>(0xffff));
+	vector<atomic<uint16_t>> vec_B(4); //, static_cast<uint16_t>(0xffff));
 	cout << "vector size() " << vec_B.size() << endl;
 	// Vector element: unique_ptr
 	vec_ptr.at(0) = std::make_unique<A>("first", 0);
@@ -84,5 +88,16 @@ static void test_1()
         for(ssize_t i=0; i<26; i++, d++)
                 txq.push_back(d);
         fprintf(stdout, "%s\n", txq.data());
-        fprintf(stdout, "txq size: %d\n", txq.size());
+        fprintf(stdout, "txq size: %zd\n", txq.size());
+}
+
+static void test_2()
+{
+	cout << __func__ << endl;
+	vector<int> vec {1, 2, 3, 4, 5};
+	std::vector<int>::iterator iter = vec.begin();
+	vec.resize(vec.capacity() + 1);
+	for (auto i : vec)
+		cout << i;
+	cout << endl << __func__ << " end\n";
 }
