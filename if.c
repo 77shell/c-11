@@ -8,4 +8,8 @@ main(int argc, char *argv[])
 		puts("OK");
 	else
 		printf("%d\n", err);
+
+	int i = 10;
+	int j = i % 10;
+	printf("i %d j %d\n", i, j);
 }

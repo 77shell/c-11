@@ -25,7 +25,7 @@ INCLUDEPATH += -iquote$(SRC_ROOT)/include -iquote"/home/max/src/csu.linux/includ
 LIBSPATH = -Wl,-rpath,/home/max/src/csu.linux/x86/gcc-9.3.0-17/usr/local/lib64
 
 
-CXXFLAGS += $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
+CXXFLAGS += -std=gnu++17 $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
 CFLAGS   += -Wextra -Wno-override-init $(DEBUG) $(OPTIMIZE) $(PROFILE) $(INCLUDEPATH) $(LIBSPATH) $(LIBFLAGS)
 
 COMPILE.cc = $(CXX) $(CXXFLAGS)
@@ -57,6 +57,7 @@ impl: impl.cpp impl.h impl_test.cpp
 .PHONY: all
 all: $(BINS)
 
+thread_id: CXXFLAGS += -pthread
 #receiver: receiver.o
 #	$(CXX) -o $@ $< -lcan
 
@@ -93,6 +94,7 @@ test_ptr: test_ptr.cpp
 sem: CXXFLAGS += -pthread
 ctor: CXXFLAGS += -pthread
 shared_ptr2: CXXFLAGS += -pthread
+share_ptr: CXXFLAGS += -std=gnu++2a
 mutex: CXXFLAGS += -pthread
 forward_list: CXXFLAGS += -pthread
 datum_cstr: CXXFLAGS += -fstack-protector-all -fsanitize=address

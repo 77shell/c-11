@@ -134,6 +134,7 @@ int main(int argc, char *argv[])
         cout << "Local date/time\n";
         print_date_time(*std::localtime(&since_epoc_sec));
 
+	std::cout << "sizeof(std::tm) " << sizeof(std::tm) << std::endl;
 	// Inverse gmtime(time_t) -> tm
 	// timegm(tm*) -> time_t
 	{
@@ -168,6 +169,21 @@ int main(int argc, char *argv[])
 		print_date_time(*std::localtime(&t0));
 	}
 
+	{
+		cout << "\nUTC 2023-5-17 14:00:00\n";
+		std::tm utc_tm {};
+		utc_tm.tm_year = 123; // since 1900
+		utc_tm.tm_mon = 4;
+		utc_tm.tm_mday = 17;
+		utc_tm.tm_hour = 14;
+		utc_tm.tm_min = 0;
+		utc_tm.tm_sec = 0;
+		std::time_t t0 {timegm(&utc_tm)};
+		cout << "UTC second: " << t0 << endl;
+		print_date_time(*std::gmtime(&t0));
+		cout << "Local date/time\n";
+		print_date_time(*std::localtime(&t0));
+	}
  
 	{
 		cout << endl;
@@ -229,10 +245,6 @@ int main(int argc, char *argv[])
 
 		// UTC:   Wed Dec 31 23:59:59 1969 GMT
 		usec = 0xffffffff;
-		std::cout << "UTC:   " << std::put_time(std::gmtime(&usec), "%c %Z") << '\n';
-
-		// UTC:   Wed Dec 31 23:59:58 1969 GMT
-		usec = 0xfffffffe;
 		std::cout << "UTC:   " << std::put_time(std::gmtime(&usec), "%c %Z") << '\n';
 
 		// UTC:   Fri Dec 13 20:45:52 1901 GMT

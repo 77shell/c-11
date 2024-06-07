@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[])
 {
-        std::thread::id i {};
+        std::thread::id i {std::thread::id()};
         std::thread::id j {std::this_thread::get_id()};
         std::cout << "Default thread id " << i << std::endl;
         std::cout << "Current thread id " << j << std::endl;

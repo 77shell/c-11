@@ -26,12 +26,20 @@ struct S {
 	int s {1};
 };
 
+std::unique_ptr<S>
+create_s()
+{
+	return make_unique<S>(99);
+}
+
 int
 main(int argc, char *argv[])
 {
 	queue<unique_ptr<S>> qu;
 	qu.push(make_unique<S>(10));
+	qu.push(std::move(create_s()));
 
+	int r = getchar();
 	unique_ptr<S> p0;
 	p0 = std::move(qu.front());
 	cout << p0->s << endl;
