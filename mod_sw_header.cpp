@@ -148,8 +148,8 @@ public:
 
 	const std::filesystem::path sw_path;
 	bool good() const;
-	std::size_t data_size() const;
-	std::ifstream data_ifstream() const;
+	std::size_t program_size() const;
+	std::ifstream program_ifstream() const;
 
 private:
 	struct impl_t;
@@ -245,8 +245,8 @@ struct MODSWheader::impl_t {
 	uint16_t data_crc16 {UINT16_MAX};
 
 	bool good() const;
-	std::size_t data_size() const;
-	std::ifstream data_ifstream() const;
+	std::size_t program_size() const;
+	std::ifstream program_ifstream() const;
 };
 
 MODSWheader::MODSWheader(const std::filesystem::path &sw)
@@ -256,22 +256,22 @@ MODSWheader::MODSWheader(const std::filesystem::path &sw)
 bool MODSWheader::good() const
 { return mp_Impl->good(); }
 
-std::ifstream MODSWheader::data_ifstream() const
-{ return mp_Impl->data_ifstream(); }
+std::ifstream MODSWheader::program_ifstream() const
+{ return mp_Impl->program_ifstream(); }
 
-std::size_t MODSWheader::data_size() const
-{ return mp_Impl->data_size(); }
+std::size_t MODSWheader::program_size() const
+{ return mp_Impl->program_size(); }
 
 // impl_t
 // ---------------------------------------------------------------------
 bool MODSWheader::impl_t::good() const
 { return header.file_crc16 == file_crc16 && header.data_crc16 == data_crc16; }
 
-std::size_t MODSWheader::impl_t::data_size() const
+std::size_t MODSWheader::impl_t::program_size() const
 { return specific.programsize; }
 
 std::ifstream
-MODSWheader::impl_t::data_ifstream() const
+MODSWheader::impl_t::program_ifstream() const
 {
 	if (good()) {
 		std::ifstream s {file_path};
@@ -292,9 +292,9 @@ main(int argc, char *argv[])
 	std::filesystem::path sw_path {argv[1]};
 	MODSWheader h {sw_path};
 	std::cout << sw_path << " wellness: " << h.good() << std::endl;
-	std::ifstream f {h.data_ifstream()};
+	std::ifstream f {h.program_ifstream()};
 	std::cout << "fstream open state: " << f.is_open() << std::endl;
-	std::size_t len {h.data_size() - sizeof(uint16_t)}; // uint16_t : CRC-16
+	std::size_t len {h.program_size() - sizeof(uint16_t)}; // uint16_t : CRC-16
 
 	uint16_t crc0 {};
 	std::istreambuf_iterator<char> start {f};
