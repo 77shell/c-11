@@ -148,6 +148,9 @@ public:
 
 	const std::filesystem::path sw_path;
 	bool good() const;
+	imbus::module_e module_type() const;
+	uint16_t device_idx() const;
+	uint16_t sw_compatibility_idx() const;
 	std::size_t sw_size() const;
 	std::ifstream sw_ifstream() const;
 
