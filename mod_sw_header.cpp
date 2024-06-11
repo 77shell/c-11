@@ -49,16 +49,305 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+#include <map>
+#include <linux/can.h>
 #include <arpa/inet.h>
 
 #define DEBUG
 
+namespace imbus {
+	enum class module_e : uint8_t {
+		NotUsed = 0,
+		PSC = 1,
+		UIM = 2,
+		GWM = 3,
+		SVR = 4,
+		HPS = 5,
+		SSM = 6,
+		BSM = 7,
+		MISC = 8,
+		IOM = 9,
+		RFM = 10,
+		PCM = 11,
+		ACM = 12,
+		DCC = 13,
+		Reserved = 14,
+		GEN = 15
+	};
+
+	const std::map<module_e, std::string_view> Modulestr_map {
+		{ module_e::PSC, "PSU" },
+		{ module_e::UIM, "UIM" },
+		{ module_e::GWM, "GWM" },
+		{ module_e::SVR, "SVR" },
+		{ module_e::HPS, "HPS" },
+		{ module_e::SSM, "SSM" },
+		{ module_e::BSM, "BSM" },
+		{ module_e::MISC, "MISC" },
+		{ module_e::IOM, "IOM" },
+		{ module_e::RFM, "RFM " },
+		{ module_e::PCM, "PCM" },
+		{ module_e::ACM, "ACM" },
+		{ module_e::DCC, "DCC" },
+		{ module_e::GEN, "GEN" }
+	};
+
+	module_e
+	module_type(uint8_t modnbr)
+	{
+		const module_e mod {static_cast<module_e>(modnbr)};
+
+		switch (mod) {
+		case module_e::PSC:
+		case module_e::UIM:
+		case module_e::GWM:
+		case module_e::SVR:
+		case module_e::HPS:
+		case module_e::SSM:
+		case module_e::BSM:
+		case module_e::MISC:
+		case module_e::IOM:
+		case module_e::RFM:
+		case module_e::PCM:
+		case module_e::ACM:
+		case module_e::DCC:
+		case module_e::GEN:
+			return mod;
+
+		case module_e::NotUsed:
+		case module_e::Reserved:
+		default:
+			return module_e::Reserved;
+		}
+	}
+
+	std::string_view
+	module_type_str(module_e mod)
+	{
+		auto r {Modulestr_map.find(mod)};
+		return r != Modulestr_map.end() ? r->second : std::string_view {"Unknown module type"};
+	}
+
+	namespace rfm {
+		/* Order follows device index in document, IMBUS_Module-Serial-Number.docx */
+		enum class type_e : uint16_t {
+			Unknown = 0,
+			No_RFM_Connected = 1,
+			FR48V_2000_E = 2,
+			DPR1200B_48 = 3,
+			DPR1500B_48 = 4,
+			DPR600B_48 = 5,
+			DPR7200B_48 = 6,
+			FR48_60_2000 = 7,
+			UNKNOWN_24 = 8,
+			UNKNOWN_60 = 9,
+			DPR600B_60  = 10,
+			DPR3500B_48 = 11,
+			DPR3500B_24 = 12,
+			DPR300B_48 = 13,
+			DPR1600B_48 = 14,
+			DPR2700B_48 = 15,
+			DPR2400B_48 = 16,
+			DPR4000B_48 = 17,
+			DPR2900B_48 = 18,
+			DPR4000B_48_60 = 19,
+			DPR850B_48 = 20,
+			DPR2000B_48 = 21,
+			DPR6000B_48A1 = 22,
+			DPR6000B_48B1 = 23,
+			DPR48_15B = 24,
+			DPR24_100B = 25,
+			DPR3000B_48 = 26,
+			ESR48_56FF = 27,
+			DPR2900F_48A1 = 28,
+			DPR4000B_48A5 = 29,
+			DPR6000B_48A1_CH = 30,
+			DPR2500F_48A1 = 31,
+			DPR3000B_48A1 = 32,
+			DPR1000B_48 = 33,
+			DPR12000_240V = 34,
+			DPR12000_336V = 35,
+			DPR3000B_48A4 = 36,
+			DPR1800B_48 = 37,
+			DPR1800B_48A2 = 38,
+			DPR6000B_48A2 = 39,
+			DPR10000B_48C1_3PH_HV = 40,
+			DPR10000B_48C1_3PH_LV = 41,
+			DPR2900B_48A7 = 42,
+			DPR2000B_48A2_Eltek = 43,
+			DPR1800B_48B1 = 44,
+			DPR7200B_48C1_3PH_HV = 45,
+			DPR7200B_48C1_3PH_LV = 46,
+			DPR3500B_48A2 = 47,
+			DPR1800E_48D1 = 48,
+			DPR3600B_60A2 = 49,
+			DPR1080E_48D1 = 50,
+			DPR1800B_60VI2 = 51,
+			DPR18000B_240 = 52,
+			DPC1000B_48A1 = 53,
+			DPR2000B_48B1 = 54,
+			DPR110V_HVDC_India = 55,
+			DPR1800B_48A3 = 56,
+			DPR2000B_48A3 = 57,
+			Reserved_other_110V = 58,
+			Reserved_other_220V = 59,
+			Reserved_other_336V = 60,
+			DPR11000B_48C1_3PH_HV = 61,
+			DPR11000B_48C1_3PH_LV = 62,
+			// eDPR2000N_48_IP65_JP = 63,
+			DPR2000N_48 = 63,
+			DPR3000N_48_3PH_LV_IP65_JP = 64,
+			HVR_270_125A_A = 65,
+			HVR_336_90A_A = 66,
+			DPR3000E_48U1 = 67,
+			DPR2900B_48B1 = 68,
+			DPR3000N_48 = 69,
+			DPC3000N_48 = 69, // DC input
+			DPC3000B_48 = 73, // DC input
+			DPR1500N_60 = 77, // Lyft PSU 75V
+		};
+
+		const std::map<type_e, std::string_view> Typestr_map {
+			{ type_e::Unknown,		"Unknown RFM" },
+			{ type_e::No_RFM_Connected,	"No RFM connected" },
+			{ type_e::FR48V_2000_E,		"FR48V 2000E" },
+			{ type_e::DPR1200B_48,		"DPR1200B 48" },
+			{ type_e::DPR1500B_48,		"DPR1500B 48" },
+			{ type_e::DPR600B_48,		"DPR600B 48" },
+			{ type_e::DPR7200B_48,		"DPR7200B 48" },
+			{ type_e::FR48_60_2000,		"FR48 60 2000" },
+			{ type_e::UNKNOWN_24,		"UNKNOWN 24" },
+			{ type_e::UNKNOWN_60,		"UNKNOWN 60" },
+			{ type_e::DPR600B_60,		"DPR600B 60 " },
+			{ type_e::DPR3500B_48,		"DPR3500B 48" },
+			{ type_e::DPR3500B_24,		"DPR3500B 24" },
+			{ type_e::DPR300B_48,		"DPR300B 48" },
+			{ type_e::DPR1600B_48,		"DPR1600B 48" },
+			{ type_e::DPR2700B_48,		"DPR2700B 48" },
+			{ type_e::DPR2400B_48,		"DPR2400B 48" },
+			{ type_e::DPR4000B_48,		"DPR4000B 48" },
+			{ type_e::DPR2900B_48,		"DPR2900B 48" },
+			{ type_e::DPR4000B_48_60,	"DPR4000B 48 60" },
+			{ type_e::DPR850B_48,		"DPR850B 48" },
+			{ type_e::DPR2000B_48,		"DPR2000B 48" },
+			{ type_e::DPR6000B_48A1,	"DPR6000B 48A1" },
+			{ type_e::DPR6000B_48B1,	"DPR6000B 48B1" },
+			{ type_e::DPR48_15B,		"DPR48 15B" },
+			{ type_e::DPR24_100B,		"DPR24 100B" },
+			{ type_e::DPR3000B_48,		"DPR3000B 48" },
+			{ type_e::ESR48_56FF,		"ESR48/56FF" },
+			{ type_e::DPR2900F_48A1,	"DPR2900F 48A1" },
+			{ type_e::DPR4000B_48A5,	"DPR4000B 48A5" },
+			{ type_e::DPR6000B_48A1_CH,	"DPR6000B 48A1_CH" },
+			{ type_e::DPR2500F_48A1,	"DPR2500F 48A1" },
+			{ type_e::DPR3000B_48A1,	"DPR3000B 48A1" },
+			{ type_e::DPR1000B_48,		"DPR1000B 48" },
+			{ type_e::DPR12000_240V,	"DPR12000 240V" },
+			{ type_e::DPR12000_336V,	"DPR12000 336V" },
+			{ type_e::DPR3000B_48A4,	"DPR3000B 48A4" },
+			{ type_e::DPR1800B_48,		"DPR1800B 48" },
+			{ type_e::DPR1800B_48A2,	"DPR1800B 48A2" },
+			{ type_e::DPR6000B_48A2,	"DPR6000B 48A2" },
+			{ type_e::DPR10000B_48C1_3PH_HV, "DPR10000B 48C1_3PH_HV" },
+			{ type_e::DPR10000B_48C1_3PH_LV, "DPR10000B 48C1_3PH_LV" },
+			{ type_e::DPR2900B_48A7,	"DPR2900B 48A7" },
+			{ type_e::DPR2000B_48A2_Eltek,	"DPR2000B 48A2_Eltek" },
+			{ type_e::DPR1800B_48B1,	"DPR1800B 48B1" },
+			{ type_e::DPR7200B_48C1_3PH_HV,"DPR7200B 48C1_3PH_HV" },
+			{ type_e::DPR7200B_48C1_3PH_LV,"DPR7200B 48C1_3PH_LV" },
+			{ type_e::DPR3500B_48A2,	"DPR3500B 48A2" },
+			{ type_e::DPR1800E_48D1,	"DPR1800E 48D1" },
+			{ type_e::DPR3600B_60A2,	"DPR3600B 60A2" },
+			{ type_e::DPR1080E_48D1,	"DPR1080E 48D1" },
+			{ type_e::DPR2000N_48,         "DPR2000N 48" },
+			{ type_e::DPR3000N_48,		"DPR3000N 48" },
+			{ type_e::DPC3000B_48,		"DPC3000B 48" },
+			{ type_e::DPR1500N_60,		"DPR1500N 60" }
+		};
+
+		type_e
+		device_type(uint16_t device_idx)
+		{
+			if (device_idx == 0xff)
+				return type_e::No_RFM_Connected;
+
+			type_e t {static_cast<type_e>(device_idx)};
+
+			switch (t) {
+				// case type_e::UNKNOWN_48:
+			case type_e::FR48V_2000_E:      /* 2 */
+			case type_e::DPR1200B_48:       /* 3 */
+			case type_e::DPR1500B_48:       /* 4 */
+			case type_e::DPR600B_48:        /* 5 */
+			case type_e::DPR7200B_48:       /* 6 */
+			case type_e::FR48_60_2000:      /* 7 */
+				// case type_e::UNKNOWN_24:        /* 8 */
+				// case type_e::UNKNOWN_60:        /* 9 */
+			case type_e::DPR600B_60:        /* 10 */
+			case type_e::DPR3500B_48:       /* 11 */
+				// case type_e::DPR3500B_24:       /* 12 */
+			case type_e::DPR300B_48:        /* 13 */
+			case type_e::DPR1600B_48:       /* 14 */
+			case type_e::DPR2700B_48:       /* 15 */
+			case type_e::DPR2400B_48:       /* 16 */
+			case type_e::DPR4000B_48:       /* 17 */
+			case type_e::DPR2900B_48:       /* 18 */
+			case type_e::DPR4000B_48_60:    /* 19 */
+			case type_e::DPR850B_48:        /* 20 */
+			case type_e::DPR2000B_48:       /* 21 */
+			case type_e::DPR6000B_48A1:     /* 22 */
+			case type_e::DPR6000B_48B1:     /* 23 */
+			case type_e::DPR48_15B:         /* 24 */
+				// case type_e::DPR24_100B:        /* 25 */
+			case type_e::DPR3000B_48:       /* 26 */
+				// case type_e::ESR48_56FF:        /* 27 */
+			case type_e::DPR2900F_48A1:     /* 28 */
+				// case type_e::DPR4000B_48A5:     /* 29 */
+				// case type_e::DPR6000B_48A1_CH:  /* 30 */
+			case type_e::DPR2500F_48A1:     /* 31 */
+			case type_e::DPR3000B_48A1:     /* 32 */
+			case type_e::DPR1000B_48:       /* 33 */
+				// case type_e::DPR12000_240V:     /* 34 */
+				// case type_e::DPR12000_336V:     /* 35 */
+			case type_e::DPR3000B_48A4:     /* 36 */
+			case type_e::DPR1800B_48:       /* 37 */
+			case type_e::DPR1800B_48A2:     /* 38 */
+				// case type_e::DPR6000B_48A2:         /* 39 */
+				// case type_e::DPR10000B_48C1_3PH_HV: /* 40 */
+				// case type_e::DPR10000B_48C1_3PH_LV: /* 41 */
+			case type_e::DPR2900B_48A7:       /* 42 */
+			case type_e::DPR2000B_48A2_Eltek: /* 43 */
+				// case type_e::DPR1800B_48B1:       /* 44 */
+				// case type_e::DPR7200B_48C1_3PH_HV:/* 45 */
+				// case type_e::DPR7200B_48C1_3PH_LV:/* 46 */
+				// case type_e::DPR3500B_48A2:       /* 47 */
+				// case type_e::DPR1800E_48D1:       /* 48 */
+				// case type_e::DPR3600B_60A2:       /* 49 */
+				// case type_e::DPR1080E_48D1:       /* 50 */
+			case type_e::DPR2000N_48: /* 63 */
+			case type_e::DPR3000N_48: /* 69 */
+			case type_e::DPC3000B_48: /* 73 */
+			case type_e::DPR1500N_60: /* 77 */
+				return t;
+
+			default: return type_e::Unknown;
+			}
+		}
+
+		std::string_view
+		device_type_str(type_e t) {
+			auto r {Typestr_map.find(t)};
+			return r != Typestr_map.end() ? r->second : Typestr_map.at(type_e::Unknown);
+		}
+	} /* namespace rfm */
+}
+
 struct specific_header_t {
-	char		programversion[9];	// Concatenation of the version and the build contained into the data.
-	uint8_t		moduletype;		// Module type contained into the data
-	uint16_t	device_index;		// Device index provided as argument
+	char		prog_version[9];	// Concatenation of the version and the build contained into the data.
+	uint8_t		mod_type;		// Module type contained into the data
+	uint16_t	dev_idx;		// Device index provided as argument
 	uint16_t	software_compatibility_index;	// Sw Compatibility index provided as argument
-	uint32_t	programsize;		// Size of the data
+	uint32_t	prog_size;		// Size of the data
 };
 
 struct modsw_header_t {
@@ -105,26 +394,14 @@ print_header(const modsw_header_t &h)
 	std::cout << "Specific header size:		" << std::dec << h.specific_header_size << "-byte\n";
 }
 
-std::string_view
-module_type(uint8_t t)
-{
-	return std::string_view {"Module-Type"};
-}
-
-std::string_view
-device_index(uint16_t i)
-{
-	return std::string_view {"Device-Type"};
-}
-
 static void
 print_specific(const specific_header_t &h)
 {
-	std::cout << "Program version:		" << std::string_view {h.programversion} << std::endl;
-	std::cout << "Module type:			" << module_type(h.moduletype) << std::endl;
-	std::cout << "Device index:			" << device_index(h.device_index) << std::endl;
+	std::cout << "Program version:		" << std::string_view {h.prog_version} << std::endl;
+	std::cout << "Module type:			" << h.mod_type << std::endl;
+	std::cout << "Device index:			" << h.dev_idx << std::endl;
 	std::cout << "Software compatibility index:	" << std::dec << h.software_compatibility_index << std::endl;
-	std::cout << "Programe size:			" << std::dec << h.programsize << "-byte\n";
+	std::cout << "Programe size:			" << std::dec << h.prog_size << "-byte\n";
 }
 
 static void
@@ -147,12 +424,14 @@ public:
 	MODSWheader(const std::filesystem::path&);
 
 	const std::filesystem::path sw_path;
-	bool good() const;
-	imbus::module_e module_type() const;
-	uint16_t device_idx() const;
-	uint16_t sw_compatibility_idx() const;
-	std::size_t sw_size() const;
-	std::ifstream sw_ifstream() const;
+	bool			good() const;
+	imbus::module_e		module_type() const;
+	std::string_view	module_type_str() const;
+	uint16_t		device_idx() const;
+	std::string_view	rfm_device_type() const;
+	int			sw_compatibility_idx() const;
+	std::size_t		sw_size() const;
+	std::ifstream		sw_ifstream() const;
 
 private:
 	struct impl_t;
@@ -160,84 +439,7 @@ private:
 };
 
 struct MODSWheader::impl_t {
-	impl_t(const std::filesystem::path &sw)
-		: file_path {sw}
-		{
-			if (!std::filesystem::exists(sw)) {
-				std::cerr << "MODSWheader: " << sw.string() << " doesn't exist!\n" << std::flush;
-				return;
-			}
-
-			if (!std::filesystem::is_regular_file(sw)) {
-				std::cerr << "MODSWheader: " << sw.string() << " is not a file!\n" << std::flush;
-				return;
-			}
-
-			std::ifstream f;
-			try {
-				f.open(sw);
-				f.read(reinterpret_cast<char*>(&header), sizeof header);
-
-				header.file_crc16 = ntohs(header.file_crc16);
-				header.standard_header_structure_index = ntohs(header.standard_header_structure_index);
-				header.standard_header_minimal_compatibility_index = ntohs(header.standard_header_minimal_compatibility_index);
-				header.file_type = ntohl(header.file_type);
-				header.header_size = ntohl(header.header_size);
-				header.file_size = ntohl(header.file_size);
-				header.data_crc16 = ntohs(header.data_crc16);
-				header.specific_header_structure_index = ntohs(header.specific_header_structure_index);
-				header.specific_header_minimal_compatibility_index = ntohs(header.specific_header_minimal_compatibility_index);
-				header.data_structure_index = ntohs(header.data_structure_index);
-				header.specific_header_size = ntohl(header.specific_header_size);
-				print_header(header);
-
-				std::unique_ptr<char[]> buf = std::make_unique<char[]>(header.specific_header_size);
-				f.read(reinterpret_cast<char*>(buf.get()), header.specific_header_size);
-
-				char *ptr {buf.get()};
-				std::memcpy(specific.programversion, ptr, sizeof specific.programversion);
-				ptr += sizeof specific.programversion;
-				std::memcpy(&specific.moduletype, ptr, sizeof specific.moduletype);
-				ptr += sizeof specific.moduletype;
-				std::memcpy(&specific.device_index, ptr, sizeof specific.device_index);
-				specific.device_index = ntohs(specific.device_index);
-				ptr += sizeof specific.device_index;
-				std::memcpy(&specific.software_compatibility_index, ptr, sizeof specific.software_compatibility_index);
-				specific.software_compatibility_index = ntohs(specific.software_compatibility_index);
-				ptr += sizeof specific.software_compatibility_index;
-				std::memcpy(&specific.programsize, ptr, sizeof specific.programsize);
-				specific.programsize = ntohl(specific.programsize);
-				print_specific(specific);
-
-				f.read(reinterpret_cast<char*>(&tail), sizeof tail);
-				print_tail(tail);
-
-				/*
-				 * Data CRC-16
-				 */
-				// std::vector<uint8_t> vec {std::istreambuf_iterator<char>(f), {}};
-
-				/*
-				 * Last 2-byte is the program CRC-16,
-				 * it is appended in tail of the firmware, the data CRC-16 doesn't count it.
-				 */
-				data_crc16 = crc::calculate_crc16(f, specific.programsize - sizeof (uint16_t));
-				std::cout << "Data CRC-16: " << std::hex << data_crc16 << "h\n";
-
-				/*
-				 * Calculate file CRC-16
-				 */
-				std::ifstream f1 {sw};
-				f1.seekg(sizeof header.file_crc16); // Skip first element of the header (File CRC16)
-				file_crc16 = crc::calculate_crc16(f1);
-				std::cout << "File CRC-16: " << std::hex << file_crc16 << "h\n";
-			}
-			catch (const std::ifstream::failure &e) {
-				std::cout << e.what() << std::endl;
-			}
-			f.close();
-		}
-
+	impl_t(const std::filesystem::path &sw);
 	~impl_t() = default;
 
 	const std::filesystem::path file_path;
@@ -247,17 +449,39 @@ struct MODSWheader::impl_t {
 	uint16_t file_crc16 {UINT16_MAX};
 	uint16_t data_crc16 {UINT16_MAX};
 
-	bool good() const;
-	std::size_t sw_size() const;
-	std::ifstream sw_ifstream() const;
+	constexpr bool		good() const;
+	imbus::module_e		module_type() const;
+	std::string_view	module_type_str() const;
+	constexpr uint16_t	device_idx() const;
+	std::string_view	rfm_device_type() const;
+	constexpr uint16_t	sw_compatibility_idx() const;
+	constexpr std::size_t	sw_size() const;
+	std::ifstream		sw_ifstream() const;
 };
 
+// MODSWheader
+// ---------------------------------------------------------------------
 MODSWheader::MODSWheader(const std::filesystem::path &sw)
 	: sw_path {sw}, mp_Impl {new impl_t {sw}}
 {}
 
 bool MODSWheader::good() const
 { return mp_Impl->good(); }
+
+imbus::module_e MODSWheader::module_type() const
+{ return mp_Impl->module_type(); }
+
+std::string_view MODSWheader::module_type_str() const
+{ return mp_Impl->module_type_str(); }
+
+uint16_t MODSWheader::device_idx() const
+{ return mp_Impl->device_idx(); }
+
+std::string_view MODSWheader::rfm_device_type() const
+{ return mp_Impl->rfm_device_type(); }
+
+int MODSWheader::sw_compatibility_idx() const
+{ return static_cast<int>(mp_Impl->sw_compatibility_idx()); }
 
 std::ifstream MODSWheader::sw_ifstream() const
 { return mp_Impl->sw_ifstream(); }
@@ -267,11 +491,109 @@ std::size_t MODSWheader::sw_size() const
 
 // impl_t
 // ---------------------------------------------------------------------
-bool MODSWheader::impl_t::good() const
+MODSWheader::impl_t::impl_t(const std::filesystem::path &sw)
+	: file_path {sw}
+{
+	if (!std::filesystem::exists(sw)) {
+		std::cerr << "MODSWheader: " << sw.string() << " doesn't exist!\n" << std::flush;
+		return;
+	}
+
+	if (!std::filesystem::is_regular_file(sw)) {
+		std::cerr << "MODSWheader: " << sw.string() << " is not a file!\n" << std::flush;
+		return;
+	}
+
+	std::ifstream f;
+	try {
+		f.open(sw);
+		f.read(reinterpret_cast<char*>(&header), sizeof header);
+
+		header.file_crc16 = ntohs(header.file_crc16);
+		header.standard_header_structure_index = ntohs(header.standard_header_structure_index);
+		header.standard_header_minimal_compatibility_index = ntohs(header.standard_header_minimal_compatibility_index);
+		header.file_type = ntohl(header.file_type);
+		header.header_size = ntohl(header.header_size);
+		header.file_size = ntohl(header.file_size);
+		header.data_crc16 = ntohs(header.data_crc16);
+		header.specific_header_structure_index = ntohs(header.specific_header_structure_index);
+		header.specific_header_minimal_compatibility_index = ntohs(header.specific_header_minimal_compatibility_index);
+		header.data_structure_index = ntohs(header.data_structure_index);
+		header.specific_header_size = ntohl(header.specific_header_size);
+		print_header(header);
+
+		std::unique_ptr<char[]> buf = std::make_unique<char[]>(header.specific_header_size);
+		f.read(reinterpret_cast<char*>(buf.get()), header.specific_header_size);
+
+		char *ptr {buf.get()};
+		std::memcpy(specific.prog_version, ptr, sizeof specific.prog_version);
+		ptr += sizeof specific.prog_version;
+		std::memcpy(&specific.mod_type, ptr, sizeof specific.mod_type);
+		ptr += sizeof specific.mod_type;
+		std::memcpy(&specific.dev_idx, ptr, sizeof specific.dev_idx);
+		specific.dev_idx = ntohs(specific.dev_idx);
+		ptr += sizeof specific.dev_idx;
+		std::memcpy(&specific.software_compatibility_index, ptr, sizeof specific.software_compatibility_index);
+		specific.software_compatibility_index = ntohs(specific.software_compatibility_index);
+		ptr += sizeof specific.software_compatibility_index;
+		std::memcpy(&specific.prog_size, ptr, sizeof specific.prog_size);
+		specific.prog_size = ntohl(specific.prog_size);
+		print_specific(specific);
+
+		f.read(reinterpret_cast<char*>(&tail), sizeof tail);
+		print_tail(tail);
+
+		/*
+		 * Data CRC-16
+		 */
+		// std::vector<uint8_t> vec {std::istreambuf_iterator<char>(f), {}};
+
+		/*
+		 * Last 2-byte is the program CRC-16,
+		 * it is appended in tail of the firmware, the data CRC-16 doesn't count it.
+		 */
+		data_crc16 = crc::calculate_crc16(f, specific.prog_size - sizeof (uint16_t));
+		std::cout << "Data CRC-16: " << std::hex << data_crc16 << "h\n";
+
+		/*
+		 * Calculate file CRC-16
+		 */
+		std::ifstream f1 {sw};
+		f1.seekg(sizeof header.file_crc16); // Skip first element of the header (File CRC16)
+		file_crc16 = crc::calculate_crc16(f1);
+		std::cout << "File CRC-16: " << std::hex << file_crc16 << "h\n";
+	}
+	catch (const std::ifstream::failure &e) {
+		std::cout << e.what() << std::endl;
+	}
+	f.close();
+}
+
+constexpr bool MODSWheader::impl_t::good() const
 { return header.file_crc16 == file_crc16 && header.data_crc16 == data_crc16; }
 
-std::size_t MODSWheader::impl_t::sw_size() const
-{ return specific.programsize; }
+imbus::module_e MODSWheader::impl_t::module_type() const
+{ return imbus::module_type(specific.mod_type); }
+
+std::string_view MODSWheader::impl_t::module_type_str() const
+{ return imbus::module_type_str(imbus::module_type(specific.mod_type)); }
+
+constexpr uint16_t MODSWheader::impl_t::device_idx() const
+{ return specific.dev_idx; }
+
+std::string_view
+MODSWheader::impl_t::rfm_device_type() const
+{
+	return module_type() == imbus::module_e::RFM
+		? imbus::rfm::device_type_str(imbus::rfm::device_type(device_idx()))
+		: std::string_view {"Not a RFM module"};
+}
+
+constexpr uint16_t MODSWheader::impl_t::sw_compatibility_idx() const
+{ return specific.software_compatibility_index; }
+
+constexpr std::size_t MODSWheader::impl_t::sw_size() const
+{ return specific.prog_size; }
 
 std::ifstream
 MODSWheader::impl_t::sw_ifstream() const
@@ -309,6 +631,11 @@ main(int argc, char *argv[])
 	crc1 = crc::calculate_crc16(f, len);
 
 	std::cout << "Re-calculated data CRC-16: " << std::hex << crc0 << '\t' << crc1 << std::endl;
+
+	std::cout << "Module type: " << h.module_type_str() << std::endl;
+	std::cout << "Device type: " << h.rfm_device_type() << std::endl;
+	std::cout << "SW Compatibility Index: " << h.sw_compatibility_idx() << std::endl;
+	std::cout << "SW size: " << std::dec << h.sw_size() << "-byte\n" << std::flush;
 	return 0;
 }
 
